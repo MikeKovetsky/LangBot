@@ -74,6 +74,8 @@ services:
     container_name: langbot
     volumes:
       - ./data:/app/data
+      # Dogfood: pass Telegram language_code to plugins via Friend.remark (|lc=xx).
+      - ../src/langbot/pkg/platform/sources/telegram.py:/app/src/langbot/pkg/platform/sources/telegram.py:ro
     restart: on-failure
     environment:
       - TZ=Asia/Shanghai

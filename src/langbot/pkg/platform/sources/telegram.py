@@ -159,6 +159,22 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
 
             return msg_components
 
+        # Group reply-to-bot: Telegram does not include @ in reply text. Inject At so
+        # group-respond-rules at=true treats it like a mention (same as QQ/etc.).
+        reply = getattr(message, 'reply_to_message', None)
+        if reply is not None:
+            reply_from = getattr(reply, 'from_user', None)
+            bot_user = getattr(bot, 'username', None) or bot_account_id
+            bot_id = getattr(bot, 'id', None)
+            if reply_from is not None and (
+                (bot_id is not None and reply_from.id == bot_id)
+                or (
+                    getattr(reply_from, 'username', None)
+                    and str(reply_from.username).lower() == str(bot_user).lstrip('@').lower()
+                )
+            ):
+                message_components.append(platform_message.At(target=bot_account_id))
+
         if message.text:
             message_text = message.text
             message_components.extend(parse_message_text(message_text))
@@ -253,28 +269,51 @@ class TelegramEventConverter(abstract_platform_adapter.AbstractEventConverter):
         lb_message = await TelegramMessageConverter.target2yiri(event.message, bot, bot_account_id)
 
         if event.effective_chat.type == 'private':
+            # language_code lives on from_user; source_platform_object is stripped
+            # to None across plugin IPC, so encode it on remark for plugins.
+            # Format: "{chat_id}|lc={language_code}"
+            lc = ''
+            if event.effective_user and getattr(event.effective_user, 'language_code', None):
+                lc = str(event.effective_user.language_code)
+            remark = str(event.effective_chat.id)
+            if lc:
+                remark = f'{remark}|lc={lc}'
             return platform_events.FriendMessage(
                 sender=platform_entities.Friend(
                     id=event.effective_chat.id,
                     nickname=event.effective_chat.first_name,
-                    remark=str(event.effective_chat.id),
+                    remark=remark,
                 ),
                 message_chain=lb_message,
                 time=event.message.date.timestamp(),
                 source_platform_object=event,
             )
         elif event.effective_chat.type in ('group', 'supergroup'):
+            # Sender must be the human (effective_user), not the chat. Chat id
+            # is on group; plugins bind Viewfy accounts by telegram user id.
+            user = event.effective_user or (event.message.from_user if event.message else None)
+            user_id = user.id if user else event.effective_chat.id
+            nickname = ''
+            if user:
+                nickname = user.first_name or user.username or str(user_id)
+            lc = ''
+            if user and getattr(user, 'language_code', None):
+                lc = str(user.language_code)
+            # Same |lc= trick as Friend.remark — GroupMember has no remark field.
+            # Also suffix member_name so plugin i18n still sees it if special_title is dropped.
+            special = f'|lc={lc}' if lc else ''
+            member_name = f'{nickname}{special}' if special else nickname
             return platform_events.GroupMessage(
                 sender=platform_entities.GroupMember(
-                    id=event.effective_chat.id,
-                    member_name=event.effective_chat.title,
+                    id=user_id,
+                    member_name=member_name,
                     permission=platform_entities.Permission.Member,
                     group=platform_entities.Group(
                         id=event.effective_chat.id,
-                        name=event.effective_chat.title,
+                        name=event.effective_chat.title or '',
                         permission=platform_entities.Permission.Member,
                     ),
-                    special_title='',
+                    special_title=special,
                 ),
                 message_chain=lb_message,
                 time=event.message.date.timestamp(),
