@@ -411,6 +411,89 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             query = update.callback_query
             await query.answer()
             try:
+                raw = (query.data or '').strip()
+                # Viewfy inline CTAs: vf:approve:<uuid> / vf:reject:<uuid>
+                if raw.startswith('vf:approve:') or raw.startswith('vf:reject:'):
+                    import langbot_plugin.api.entities.builtin.provider.session as provider_session
+
+                    decision = 'approve' if raw.startswith('vf:approve:') else 'reject'
+                    action_id = raw.split(':', 2)[2].strip()
+                    if not action_id:
+                        return
+
+                    user_id = str(query.from_user.id)
+                    chat = query.message.chat if query.message else None
+                    if chat is None:
+                        return
+                    is_group = chat.type in ('group', 'supergroup')
+                    launcher_type = (
+                        provider_session.LauncherTypes.GROUP
+                        if is_group
+                        else provider_session.LauncherTypes.PERSON
+                    )
+                    launcher_id = str(chat.id)
+
+                    bot_uuid = ''
+                    pipeline_uuid = None
+                    for b in self.ap.platform_mgr.bots:
+                        if b.adapter is self:
+                            bot_uuid = b.bot_entity.uuid
+                            pipeline_uuid = b.bot_entity.use_pipeline_uuid
+                            break
+
+                    # Diegetic label in chat edit; LLM gets action_id for roam_approve.
+                    try:
+                        mark = '✅' if decision == 'approve' else '✕'
+                        original_text = query.message.text or ''
+                        await query.edit_message_text(
+                            text=f'{original_text}\n\n{mark} {decision.capitalize()}',
+                            reply_markup=None,
+                        )
+                    except Exception:
+                        pass
+
+                    message_chain = platform_message.MessageChain(
+                        [platform_message.Plain(text=f'{decision} action_id={action_id}')]
+                    )
+                    if is_group:
+                        synthetic_event = platform_events.GroupMessage(
+                            sender=platform_entities.GroupMember(
+                                id=user_id,
+                                member_name='',
+                                permission=platform_entities.Permission.Member,
+                                group=platform_entities.Group(
+                                    id=launcher_id,
+                                    name='',
+                                    permission=platform_entities.Permission.Member,
+                                ),
+                            ),
+                            message_chain=message_chain,
+                            source_platform_object=update,
+                        )
+                    else:
+                        synthetic_event = platform_events.FriendMessage(
+                            sender=platform_entities.Friend(
+                                id=user_id,
+                                nickname='',
+                                remark='',
+                            ),
+                            message_chain=message_chain,
+                            source_platform_object=update,
+                        )
+
+                    await self.ap.query_pool.add_query(
+                        bot_uuid=bot_uuid,
+                        launcher_type=launcher_type,
+                        launcher_id=launcher_id,
+                        sender_id=user_id,
+                        message_event=synthetic_event,
+                        message_chain=message_chain,
+                        adapter=self,
+                        pipeline_uuid=pipeline_uuid,
+                        variables={'_routed_by_rule': True},
+                    )
+                    return
+
                 data = json.loads(query.data)
                 if data.get('form_action') or data.get('f'):
                     import langbot_plugin.api.entities.builtin.provider.session as provider_session
