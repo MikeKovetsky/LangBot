@@ -4,6 +4,7 @@ from __future__ import annotations
 import telegram
 import telegram.ext
 from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 import telegramify_markdown
 import typing
@@ -11,10 +12,12 @@ import traceback
 import json
 import base64
 import asyncio
+import contextlib
 import os
 import time
 import uuid
 import pydantic
+import aiohttp
 
 from langbot.pkg.utils import httpclient
 import langbot_plugin.api.definition.abstract.platform.adapter as abstract_platform_adapter
@@ -25,6 +28,19 @@ import langbot_plugin.api.definition.abstract.platform.event_logger as abstract_
 
 
 _MAX_TELEGRAM_MEDIA_BYTES = 10 * 1024 * 1024
+_MEDIA_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=30)
+_POLL_START_GRACE_SEC = 2.0
+_POLL_RETRY_MIN_SEC = 2.0
+_POLL_RETRY_MAX_SEC = 30.0
+
+
+async def _download_telegram_media(url: str, *, trust_env: bool = True) -> bytes:
+    session = httpclient.get_session(trust_env=trust_env)
+    async with session.get(url, timeout=_MEDIA_CLIENT_TIMEOUT) as response:
+        return await httpclient.read_limited(
+            response,
+            max_bytes=_MAX_TELEGRAM_MEDIA_BYTES,
+        )
 
 
 def _decode_telegram_base64_limited(value: str) -> bytes:
@@ -125,12 +141,7 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
                         component.base64,
                     )
                 elif component.url:
-                    session = httpclient.get_session()
-                    async with session.get(component.url) as response:
-                        file_bytes = await httpclient.read_limited(
-                            response,
-                            max_bytes=_MAX_TELEGRAM_MEDIA_BYTES,
-                        )
+                    file_bytes = await _download_telegram_media(component.url, trust_env=False)
                 elif component.path:
                     file_bytes = await asyncio.to_thread(
                         _read_telegram_file_limited,
@@ -184,16 +195,8 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
                 message_components.extend(parse_message_text(message.caption))
 
             file = await message.photo[-1].get_file()
-
-            file_bytes = None
-            file_format = ''
-
-            async with httpclient.get_session(trust_env=True).get(file.file_path) as response:
-                file_bytes = await httpclient.read_limited(
-                    response,
-                    max_bytes=_MAX_TELEGRAM_MEDIA_BYTES,
-                )
-                file_format = 'image/jpeg'
+            file_bytes = await _download_telegram_media(file.file_path)
+            file_format = 'image/jpeg'
 
             # NOTE: Telegram's file.file_path is a full URL of the form
             # https://api.telegram.org/file/bot<TOKEN>/<path> which embeds the
@@ -211,15 +214,8 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
                 message_components.extend(parse_message_text(message.caption))
 
             file = await message.voice.get_file()
-
-            file_bytes = None
             file_format = message.voice.mime_type or 'audio/ogg'
-
-            async with httpclient.get_session(trust_env=True).get(file.file_path) as response:
-                file_bytes = await httpclient.read_limited(
-                    response,
-                    max_bytes=_MAX_TELEGRAM_MEDIA_BYTES,
-                )
+            file_bytes = await _download_telegram_media(file.file_path)
 
             encoded = await asyncio.to_thread(base64.b64encode, file_bytes)
             message_components.append(
@@ -240,12 +236,7 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
             if file_size > _MAX_TELEGRAM_MEDIA_BYTES:
                 raise ValueError('Telegram media exceeds the size limit')
 
-            file_bytes = None
-            async with httpclient.get_session(trust_env=True).get(file.file_path) as response:
-                file_bytes = await httpclient.read_limited(
-                    response,
-                    max_bytes=_MAX_TELEGRAM_MEDIA_BYTES,
-                )
+            file_bytes = await _download_telegram_media(file.file_path)
 
             encoded = await asyncio.to_thread(base64.b64encode, file_bytes)
             message_components.append(
@@ -398,7 +389,8 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             except Exception:
                 await self.logger.error(f'Error in telegram callback: {traceback.format_exc()}')
 
-        application = ApplicationBuilder().token(config['token']).build()
+        # Allow text updates while a photo/voice download is in flight.
+        application = ApplicationBuilder().token(config['token']).concurrent_updates(True).build()
         bot = application.bot
         application.add_handler(
             MessageHandler(
@@ -611,6 +603,7 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             listeners={},
         )
         self._form_action_titles = {}
+        self._stopping = False
 
     def _cap_stream_states(self) -> None:
         while len(self.msg_stream_id) > self._MAX_STREAM_STATES:
@@ -1002,19 +995,102 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
     ):
         self.listeners.pop(event_type)
 
+    def _polling_error_callback(self, exc: TelegramError) -> None:
+        # Must be sync — PTB rejects coroutine error_callbacks.
+        ap = getattr(self, 'ap', None)
+        if ap is not None and getattr(ap, 'logger', None) is not None:
+            ap.logger.warning('Telegram getUpdates error: %s', exc)
+
+    async def _mirror(self, level: str, text: str) -> None:
+        """Write to bot EventLogger and ap.logger (main langbot-*.log)."""
+        ap = getattr(self, 'ap', None)
+        if ap is not None and getattr(ap, 'logger', None) is not None:
+            log_fn = getattr(ap.logger, level, None) or ap.logger.info
+            log_fn(text)
+        bot_fn = getattr(self.logger, level, None) or self.logger.info
+        await bot_fn(text)
+
+    async def _stop_polling_stack(self, *, teardown: bool = False) -> None:
+        """PTB order: updater.stop → application.stop → (optional) shutdown."""
+        updater = getattr(self.application, 'updater', None)
+        if updater is not None and getattr(updater, 'running', False):
+            with contextlib.suppress(Exception):
+                await updater.stop()
+        if getattr(self.application, 'running', False):
+            with contextlib.suppress(Exception):
+                await self.application.stop()
+        if teardown:
+            with contextlib.suppress(Exception):
+                await self.application.shutdown()
+
     async def run_async(self):
+        self._stopping = False
         await self.application.initialize()
         self.bot_account_id = (await self.bot.get_me()).username
-        await self.application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-        await self.application.start()
-        await self.logger.info('Telegram adapter running')
+
+        # Give a previous process's long-poll a chance to die before we contend.
+        await asyncio.sleep(_POLL_START_GRACE_SEC)
+
+        backoff = _POLL_RETRY_MIN_SEC
+        while not self._stopping:
+            try:
+                updater = self.application.updater
+                if updater is None:
+                    raise RuntimeError('Telegram Application has no updater')
+
+                if not updater.running:
+                    await self._mirror('info', 'Telegram starting long-poll...')
+                    await updater.start_polling(
+                        allowed_updates=Update.ALL_TYPES,
+                        bootstrap_retries=5,
+                        error_callback=self._polling_error_callback,
+                    )
+                if not self.application.running:
+                    await self.application.start()
+
+                await self._mirror('info', 'Telegram adapter running')
+                backoff = _POLL_RETRY_MIN_SEC
+
+                while not self._stopping:
+                    updater = self.application.updater
+                    if updater is None or not updater.running:
+                        await self._mirror(
+                            'warning',
+                            'Telegram updater stopped unexpectedly; restarting polling',
+                        )
+                        break
+                    if not self.application.running:
+                        await self._mirror(
+                            'warning',
+                            'Telegram application stopped unexpectedly; restarting',
+                        )
+                        break
+                    await asyncio.sleep(1)
+
+                if self._stopping:
+                    break
+
+                await self._stop_polling_stack(teardown=False)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                await self._mirror(
+                    'error',
+                    f'Telegram polling failed: {e}\n{traceback.format_exc()}',
+                )
+                await self._stop_polling_stack(teardown=False)
+                if self._stopping:
+                    break
+
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, _POLL_RETRY_MAX_SEC)
 
     async def kill(self) -> bool:
-        if self.application.running:
-            await self.application.stop()
-            if self.application.updater:
-                await self.application.updater.stop()
-            await self.logger.info('Telegram adapter stopped')
+        self._stopping = True
+        # Always stop updater even if application.start() never completed —
+        # otherwise an orphaned getUpdates holds the token and 409s the next boot.
+        await self._stop_polling_stack(teardown=True)
         self.msg_stream_id.clear()
         self._form_action_titles.clear()
+        await self._mirror('info', 'Telegram adapter stopped')
         return True
