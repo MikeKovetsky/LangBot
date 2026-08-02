@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: connect
+  label:
+    en_US: connect
+    zh_Hans: connect
+  description:
+    en_US: Start GitHub, X, or Cloudflare OAuth. Returns a URL to open.
+    zh_Hans: Start GitHub, X, or Cloudflare OAuth. Returns a URL to open.
+spec:
+  parameters:
+    {
+      "type": "object",
+      "properties":
+        {
+          "platform":
+            {
+              "type": "string",
+              "enum": ["github", "x", "cloudflare"],
+              "description": "Which integration to connect",
+            },
+          "product_id": { "type": "string" },
+          "domain":
+            {
+              "type": "string",
+              "description": "Required for cloudflare (apex domain)",
+            },
+          "purpose":
+            {
+              "type": "string",
+              "enum": ["blog", "inbox"],
+              "description": "Cloudflare only: blog path Worker (default) or agent inbox on inbox.<domain>",
+            },
+        },
+      "required": ["platform", "product_id"],
+    }
+  llm_prompt: >
+    Mint an OAuth URL for GitHub, X, or Cloudflare. Telegram attaches a Connect
+    button — do not paste the URL. For agent email on the customer domain prefer
+    the inbox tool action=attach (or connect cloudflare with purpose=inbox).
+    After they finish, they return to this chat.
+execution:
+  python:
+    path: connect.py
+    attr: ConnectTool

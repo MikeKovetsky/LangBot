@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: inbox
+  label:
+    en_US: inbox
+    zh_Hans: inbox
+  description:
+    en_US: Viewfy agent inbox / email (інбокс, пошта) — get/create/messages, attach hi@inbox.<domain> via Cloudflare, or send. Use when asked if we have an inbox.
+    zh_Hans: Viewfy agent inbox / email — get/create/messages, attach hi@inbox.<domain> via Cloudflare, or send.
+spec:
+  parameters:
+    {
+      "type": "object",
+      "properties":
+        {
+          "product_id": { "type": "string" },
+          "action":
+            {
+              "type": "string",
+              "enum": ["get", "create", "messages", "send", "attach"],
+              "default": "get",
+              "description": "get status+mail; create Viewfy host; messages; send; attach custom domain",
+            },
+          "domain":
+            {
+              "type": "string",
+              "description": "Apex for attach (defaults to product.domain)",
+            },
+          "to": { "type": "string", "description": "Recipient for send" },
+          "subject": { "type": "string" },
+          "text": { "type": "string" },
+          "html": { "type": "string" },
+          "limit": { "type": "integer" },
+        },
+      "required": ["product_id"],
+    }
+  llm_prompt: >
+    Viewfy agent inbox (also called інбокс / agent email / hi@inbox.<domain>).
+    For "do we have an inbox" or similar, call action=get — never say this tool is missing.
+    action=get includes cloudflare/domain DNS status; read that before claiming Cloudflare is not connected.
+    For custom domain hi@inbox.<domain>, call action=attach (Telegram Connect Cloudflare button;
+    do not paste the URL). action=attach is for email DNS, not site analytics.
+    action=send only after domain sending is ready. Never ask for the inbox password.
+execution:
+  python:
+    path: inbox.py
+    attr: InboxTool

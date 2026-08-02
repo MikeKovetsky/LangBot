@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Plugin
+metadata:
+  author: viewfy
+  name: viewfy-agent
+  repository: https://github.com/viewfy/viewfy
+  version: 0.1.6
+  description:
+    en_US: Per-user Viewfy Telegram bind, message ingest, outbox drafts in session, and agent tools.
+    zh_Hans: 按 Telegram 用户绑定 Viewfy、消息入库与代理工具。
+  label:
+    en_US: Viewfy Agent
+    zh_Hans: Viewfy Agent
+  icon: assets/icon.svg
+spec:
+  config:
+    - name: viewfy_api_base
+      type: string
+      label:
+        en_US: Viewfy API base URL
+        zh_Hans: Viewfy API 地址
+      default: http://host.docker.internal:9000
+      required: true
+    - name: telegram_agent_secret
+      type: string
+      label:
+        en_US: Telegram agent secret
+        zh_Hans: Telegram agent 密钥
+      description:
+        en_US: Must match Viewfy TELEGRAM_AGENT_SECRET
+        zh_Hans: 需与 Viewfy TELEGRAM_AGENT_SECRET 一致
+      required: true
+  components:
+    Command:
+      fromDirs:
+        - path: components/commands/
+          maxDepth: 1
+    EventListener:
+      fromDirs:
+        - path: components/events/
+          maxDepth: 1
+    Tool:
+      fromDirs:
+        - path: components/tools/
+          maxDepth: 1
+execution:
+  python:
+    path: main.py
+    attr: ViewfyAgentPlugin

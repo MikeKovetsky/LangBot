@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: variants
+  label:
+    en_US: variants
+    zh_Hans: variants
+  description:
+    en_US: List campaign variants or start generation.
+    zh_Hans: List campaign variants or start generation.
+spec:
+  parameters: {"type": "object", "properties": {"campaign_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "start"], "default": "list"}, "prompt": {"type": "string"}, "count": {"type": "integer"}, "creative_type": {"type": "string"}}, "required": ["campaign_id"]}
+  llm_prompt: List campaign variants or start generation. Use only for the linked Viewfy user.
+execution:
+  python:
+    path: variants.py
+    attr: VariantsTool

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: products
+  label:
+    en_US: products
+    zh_Hans: products
+  description:
+    en_US: List the user's Viewfy products, or get one by id (includes blog/inbox Cloudflare status).
+    zh_Hans: List the user's Viewfy products, or get one by id (includes blog/inbox Cloudflare status).
+spec:
+  parameters: {"type": "object", "properties": {"id": {"type": "string", "description": "Product UUID. Omit to list."}}}
+  llm_prompt: List the user's Viewfy products, or get one by id. Getting by id includes cloudflare.blog / cloudflare.inbox — read those before claiming Cloudflare is not connected.
+execution:
+  python:
+    path: products.py
+    attr: ProductsTool

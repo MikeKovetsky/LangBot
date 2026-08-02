@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: group_pin
+  label:
+    en_US: group_pin
+    zh_Hans: group_pin
+  description:
+    en_US: Pin this Telegram group to one Viewfy product (server-enforced).
+    zh_Hans: Pin this Telegram group to one Viewfy product (server-enforced).
+spec:
+  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set", "clear"], "default": "get"}, "product_id": {"type": "string"}}, "required": []}
+  llm_prompt: Pin this Telegram group to one product so tools cannot touch other products. Use set with product_id from a group chat. Never show product ids in chat copy.
+execution:
+  python:
+    path: group_pin.py
+    attr: GroupPinTool

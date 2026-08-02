@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: roam
+  label:
+    en_US: roam
+    zh_Hans: roam
+  description:
+    en_US: Get or set per-channel roam outreach settings.
+    zh_Hans: Get or set per-channel roam outreach settings.
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "set"], "default": "get"}, "channel": {"type": "string"}, "prompt": {"type": "string"}, "auto": {"type": "boolean"}, "active": {"type": "boolean"}}, "required": ["product_id"]}
+  llm_prompt: Get or set per-channel roam outreach settings. Use only for the linked Viewfy user.
+execution:
+  python:
+    path: roam.py
+    attr: RoamTool

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: roam_queue
+  label:
+    en_US: roam_queue
+    zh_Hans: roam_queue
+  description:
+    en_US: List pending roam drafts waiting for approval.
+    zh_Hans: List pending roam drafts waiting for approval.
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "status": {"type": "string", "default": "draft"}, "channel": {"type": "string"}, "limit": {"type": "integer"}}, "required": []}
+  llm_prompt: List pending roam drafts. Use when the founder says approve/reject so you can find the matching draft id for roam_approve. Never show action ids in chat.
+execution:
+  python:
+    path: roam_queue.py
+    attr: RoamQueueTool

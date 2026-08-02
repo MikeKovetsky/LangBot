@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: product_invite
+  label:
+    en_US: product_invite
+    zh_Hans: product_invite
+  description:
+    en_US: Mint a temp product invite link (signup then join + bind Telegram).
+    zh_Hans: Mint a temp product invite link (signup then join + bind Telegram).
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["create", "list"], "default": "create"}, "telegram_user_id": {"type": "string"}}, "required": ["product_id"]}
+  llm_prompt: Mint a product invite URL for a customer. Include the returned url verbatim once in chat. Never invent a different link. Never show UUIDs.
+execution:
+  python:
+    path: product_invite.py
+    attr: ProductInviteTool

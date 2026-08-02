@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: stats
+  label:
+    en_US: stats
+    zh_Hans: stats
+  description:
+    en_US: Viewfy tracker traffic (users/day, pageviews). Same as the dashboard Traffic panel. Prefer this over GA/Plausible/Cloudflare Analytics.
+    zh_Hans: Viewfy tracker traffic (users/day, pageviews). Same as the dashboard Traffic panel. Prefer this over GA/Plausible/Cloudflare Analytics.
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "days": {"type": "integer", "description": "Completed-day window (default 14, max 90).", "default": 14}}, "required": ["product_id"]}
+  llm_prompt: Viewfy tracker site traffic for a product (unique users, pageviews, daily series). Use for users-per-day / traffic questions. Do not ask for GA, Plausible, or Cloudflare Analytics. Cloudflare connect is only for blog DNS/worker and inbox email, not traffic stats.
+execution:
+  python:
+    path: stats.py
+    attr: StatsTool

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: campaigns
+  label:
+    en_US: campaigns
+    zh_Hans: campaigns
+  description:
+    en_US: List campaigns or get one by id.
+    zh_Hans: List campaigns or get one by id.
+spec:
+  parameters: {"type": "object", "properties": {"id": {"type": "string"}, "product_id": {"type": "string"}}}
+  llm_prompt: List campaigns or get one by id. Use only for the linked Viewfy user.
+execution:
+  python:
+    path: campaigns.py
+    attr: CampaignsTool

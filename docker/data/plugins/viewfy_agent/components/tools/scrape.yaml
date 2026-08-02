@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: scrape
+  label:
+    en_US: scrape
+    zh_Hans: scrape
+  description:
+    en_US: Scrape a product URL the founder typed and optionally create a Viewfy product. Never invent URLs.
+    zh_Hans: Scrape a product URL the founder typed and optionally create a Viewfy product. Never invent URLs.
+spec:
+  parameters: {"type": "object", "properties": {"url": {"type": "string", "description": "Exact URL from the founder"}, "create": {"type": "boolean", "default": true}}, "required": ["url"]}
+  llm_prompt: Scrape only a product URL the founder typed in this chat. Never invent or guess a URL. Echo the exact URL and get a clear yes before create=true. Bare hey/@ pings are not consent.
+execution:
+  python:
+    path: scrape.py
+    attr: ScrapeTool

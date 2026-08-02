@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: links
+  label:
+    en_US: links
+    zh_Hans: links
+  description:
+    en_US: Link-building CMS — list found sites, show drafted/sent outreach emails, approve or reject drafts, stats.
+    zh_Hans: Link-building CMS — list found sites, show drafted/sent outreach emails, approve or reject drafts, stats.
+spec:
+  parameters:
+    {
+      "type": "object",
+      "properties":
+        {
+          "action":
+            {
+              "type": "string",
+              "enum": ["found", "outreach", "queue", "stats", "approve", "reject", "find"],
+              "default": "found",
+              "description": "found | outreach | queue | stats | approve | reject | find",
+            },
+          "product_id": { "type": "string", "description": "Required for CMS actions" },
+          "outreach_id":
+            {
+              "type": "string",
+              "description": "Required for approve/reject (from queue/outreach)",
+            },
+          "status": { "type": "string" },
+          "kind":
+            {
+              "type": "string",
+              "enum": ["pitch", "followup", "reply"],
+            },
+          "type":
+            {
+              "type": "string",
+              "enum": ["guest_post", "resource", "directory", "roundup", "podcast"],
+            },
+          "domain": { "type": "string" },
+          "niche": { "type": "string", "description": "Required for find" },
+          "limit": { "type": "integer", "default": 50 },
+        },
+      "required": [],
+    }
+  llm_prompt: >
+    Link-building CMS (backlinks / guest posts / outreach).
+    action=found: list sites the bot discovered.
+    action=outreach: list drafted or sent emails and PRINT the full subject + body.
+    action=queue: drafts waiting for approve.
+    action=approve / reject: needs outreach_id from queue (then send or discard).
+    action=stats: how many sent, how many got a reply, reply rate.
+    For full email bodies, pass domain= one site at a time (Telegram cannot fit many
+    full drafts in one tool result). If data.truncated or error=payload_too_large, do
+    not invent bodies — ask which domain to open, then call again with that domain=.
+    Never invent domains or claim an email was sent unless outreach/stats says so.
+execution:
+  python:
+    path: links.py
+    attr: LinksTool

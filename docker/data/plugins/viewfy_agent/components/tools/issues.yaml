@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: issues
+  label:
+    en_US: issues
+    zh_Hans: issues
+  description:
+    en_US: List issues from the latest finished audit.
+    zh_Hans: List issues from the latest finished audit.
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "severity": {"type": "string"}, "tier": {"type": "integer"}}, "required": ["product_id"]}
+  llm_prompt: List issues from the latest finished audit. Use only for the linked Viewfy user.
+execution:
+  python:
+    path: issues.py
+    attr: IssuesTool

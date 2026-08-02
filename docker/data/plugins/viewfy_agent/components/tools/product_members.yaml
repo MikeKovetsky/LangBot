@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: product_members
+  label:
+    en_US: product_members
+    zh_Hans: product_members
+  description:
+    en_US: List collaborators; add mints invite URL or adds existing email; remove by email.
+    zh_Hans: List collaborators; add mints invite URL or adds existing email; remove by email.
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "add", "remove"], "default": "list"}, "email": {"type": "string"}, "telegram_user_id": {"type": "string"}}, "required": ["product_id"]}
+  llm_prompt: Manage product collaborators. Prefer product_invite / add without email to mint a signup link; include the url verbatim. remove needs email. Never show raw ids in chat.
+execution:
+  python:
+    path: product_members.py
+    attr: ProductMembersTool
