@@ -8,9 +8,12 @@ These tests verify:
 - Model name building with provider prefix
 """
 
+import asyncio
+
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
+import httpx
 import litellm
 
 from langbot.pkg.provider.modelmgr.requesters import litellmchat
@@ -681,7 +684,8 @@ class TestBuildCommonArgs:
         requester._build_common_args(args)
 
         assert args['api_base'] == 'https://api.openai.com/v1'
-        assert args['timeout'] == 60
+        assert isinstance(args['timeout'], httpx.Timeout)
+        assert args['timeout'].read == 60
         assert args['drop_params'] == True
         assert args['num_retries'] == 3
         assert args['api_version'] == '2024-01-01'
@@ -701,8 +705,17 @@ class TestBuildCommonArgs:
         requester._build_common_args(args, include_retry_params=False)
 
         assert args['api_base'] == 'https://api.openai.com/v1'
-        assert args['timeout'] == 60
+        assert isinstance(args['timeout'], httpx.Timeout)
+        assert args['timeout'].read == 60
         assert 'num_retries' not in args
+
+    def test_build_args_always_sets_httpx_timeout(self):
+        """Timeout must always be httpx.Timeout so aiohttp never gets sock_read=None."""
+        requester = litellmchat.LiteLLMRequester(ap=Mock(), config={})
+        args = {}
+        requester._build_common_args(args)
+        assert isinstance(args['timeout'], httpx.Timeout)
+        assert args['timeout'].read == 120
 
 
 class TestHandleLiteLLMError:
@@ -927,6 +940,33 @@ class TestInvokeLLM:
                 )
 
             assert 'API key 无效' in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_invoke_llm_wall_clock_timeout(self):
+        """asyncio.wait_for must abort a wedged acompletion even if HTTP timeouts don't."""
+        mock_ap = Mock()
+        mock_ap.tool_mgr = Mock()
+        mock_ap.tool_mgr.generate_tools_for_openai = AsyncMock(return_value=None)
+
+        requester = litellmchat.LiteLLMRequester(ap=mock_ap, config={'timeout': 0.05})
+        model = MockRuntimeModel('gpt-4o', 'test-api-key')
+
+        import langbot_plugin.api.entities.builtin.provider.message as provider_message
+
+        messages = [provider_message.Message(role='user', content='Hello')]
+
+        async def hang(**_kwargs):
+            await asyncio.sleep(10)
+
+        with patch.object(litellmchat, 'acompletion', new_callable=AsyncMock, side_effect=hang):
+            with pytest.raises(errors.RequesterError) as exc_info:
+                await requester.invoke_llm(query=None, model=model, messages=messages)
+
+            assert '请求超时' in str(exc_info.value)
+            assert 'LLM call exceeded' in str(exc_info.value)
+            called_timeout = litellmchat.acompletion.await_args.kwargs['timeout']
+            assert isinstance(called_timeout, httpx.Timeout)
+            assert called_timeout.read == pytest.approx(0.05)
 
 
 class TestInvokeEmbedding:

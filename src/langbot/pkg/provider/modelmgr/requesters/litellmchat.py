@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import typing
 
+import httpx
 import litellm
 from litellm import acompletion, aembedding, arerank
 
@@ -12,6 +14,12 @@ from ....utils import httpclient
 import langbot_plugin.api.entities.builtin.resource.tool as resource_tool
 import langbot_plugin.api.entities.builtin.pipeline.query as pipeline_query
 import langbot_plugin.api.entities.builtin.provider.message as provider_message
+
+# Hard ceiling for a single completion attempt. LiteLLM's aiohttp transport
+# only sets sock_read (no ClientTimeout.total), so a wedged Anthropic
+# connection can sit far past the configured socket timeout — we saw ~70 min.
+# asyncio.wait_for is the reliable kill switch on top of httpx.Timeout.
+_DEFAULT_LLM_TIMEOUT_S = 120.0
 
 
 class _ThinkStripState:
@@ -167,7 +175,7 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
 
     default_config: dict[str, typing.Any] = {
         'base_url': '',
-        'timeout': 120,
+        'timeout': _DEFAULT_LLM_TIMEOUT_S,
         'custom_llm_provider': '',
         'drop_params': False,
         'num_retries': 0,
@@ -179,6 +187,40 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
         # LiteLLM doesn't require explicit client initialization
         # Configuration is passed per-request via litellm params
         pass
+
+    def _timeout_seconds(self) -> float:
+        """Wall-clock seconds for one LLM HTTP attempt."""
+        raw = self.requester_cfg.get('timeout', _DEFAULT_LLM_TIMEOUT_S)
+        if isinstance(raw, httpx.Timeout):
+            for candidate in (raw.read, raw.connect, raw.write, raw.pool):
+                if candidate is not None:
+                    try:
+                        value = float(candidate)
+                    except (TypeError, ValueError):
+                        continue
+                    if value > 0:
+                        return value
+            return _DEFAULT_LLM_TIMEOUT_S
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return _DEFAULT_LLM_TIMEOUT_S
+        return value if value > 0 else _DEFAULT_LLM_TIMEOUT_S
+
+    def _coerce_httpx_timeout(self, value: typing.Any = None) -> httpx.Timeout:
+        """Normalize timeout to httpx.Timeout so connect/read/write/pool are all set."""
+        if isinstance(value, httpx.Timeout):
+            return value
+        if value is None:
+            seconds = self._timeout_seconds()
+        else:
+            try:
+                seconds = float(value)
+            except (TypeError, ValueError):
+                seconds = self._timeout_seconds()
+            if seconds <= 0:
+                seconds = _DEFAULT_LLM_TIMEOUT_S
+        return httpx.Timeout(seconds)
 
     def _build_litellm_model_name(self, model_name: str, custom_llm_provider: str | None = None) -> str:
         """Build LiteLLM model name with provider prefix if needed."""
@@ -610,8 +652,8 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
         """Apply common requester config to args dict."""
         if self.requester_cfg.get('base_url'):
             args['api_base'] = self.requester_cfg['base_url']
-        if self.requester_cfg.get('timeout'):
-            args['timeout'] = self.requester_cfg['timeout']
+        # Always set a real httpx.Timeout — never omit (aiohttp then gets sock_read=None).
+        args['timeout'] = self._coerce_httpx_timeout(self.requester_cfg.get('timeout'))
         if include_retry_params:
             if self.requester_cfg.get('drop_params'):
                 args['drop_params'] = self.requester_cfg['drop_params']
@@ -641,6 +683,15 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
         if isinstance(e, litellm.APIError):
             raise errors.RequesterError(f'API 错误: {str(e)}')
         raise errors.RequesterError(f'未知错误: {str(e)}')
+
+    async def _acompletion_bounded(self, args: dict) -> typing.Any:
+        """Run acompletion with httpx + asyncio wall-clock ceilings."""
+        timeout_s = self._timeout_seconds()
+        args = {**args, 'timeout': self._coerce_httpx_timeout(args.get('timeout', timeout_s))}
+        try:
+            return await asyncio.wait_for(acompletion(**args), timeout=timeout_s)
+        except asyncio.TimeoutError as e:
+            raise errors.RequesterError(f'请求超时: LLM call exceeded {timeout_s:g}s') from e
 
     async def _build_completion_args(
         self,
@@ -676,6 +727,8 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
                 args['tools'] = tools
                 args.setdefault('tool_choice', 'auto')
 
+        # Re-normalize after extra_args so callers cannot wipe timeout to None/int-only.
+        args['timeout'] = self._coerce_httpx_timeout(args.get('timeout'))
         return args
 
     async def invoke_llm(
@@ -691,7 +744,7 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
         args = await self._build_completion_args(model, messages, funcs, extra_args, stream=False)
 
         try:
-            response = await acompletion(**args)
+            response = await self._acompletion_bounded(args)
 
             message_data = response.choices[0].message.model_dump()
             if 'role' not in message_data or message_data['role'] is None:
@@ -709,6 +762,8 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
 
             return message, usage_info
 
+        except errors.RequesterError:
+            raise
         except Exception as e:
             self._handle_litellm_error(e)
 
@@ -730,7 +785,9 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
         think_state = _ThinkStripState() if remove_think else None
 
         try:
-            response = await acompletion(**args)
+            # Bounds stream setup (first response headers). Mid-stream idle
+            # hangs are still limited by httpx read timeout on each chunk.
+            response = await self._acompletion_bounded(args)
             async for chunk in response:
                 # Capture usage whenever a chunk carries it.
                 #
@@ -807,6 +864,8 @@ class LiteLLMRequester(requester.ProviderAPIRequester):
                         is_final=True,
                     )
 
+        except errors.RequesterError:
+            raise
         except Exception as e:
             self._handle_litellm_error(e)
 

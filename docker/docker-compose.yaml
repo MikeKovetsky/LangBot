@@ -76,6 +76,8 @@ services:
       - ./data:/app/data
       # Dogfood: pass Telegram language_code to plugins via Friend.remark (|lc=xx).
       - ../src/langbot/pkg/platform/sources/telegram.py:/app/src/langbot/pkg/platform/sources/telegram.py:ro
+      # Dogfood: hard wall-clock ceiling on wedged Anthropic/LiteLLM calls.
+      - ../src/langbot/pkg/provider/modelmgr/requesters/litellmchat.py:/app/src/langbot/pkg/provider/modelmgr/requesters/litellmchat.py:ro
     restart: on-failure
     environment:
       - TZ=Asia/Shanghai
