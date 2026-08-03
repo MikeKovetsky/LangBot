@@ -47,14 +47,16 @@ spec:
   llm_prompt: >
     Link-building CMS (backlinks / guest posts / outreach).
     action=found: list sites the bot discovered.
-    action=outreach: list drafted or sent emails and PRINT the full subject + body.
-    action=queue: drafts waiting for approve.
+    action=stats: how many sent, how many got a reply, reply rate — prefer this for
+    status / "what's next" / task overviews (no email bodies).
+    action=queue: drafts waiting for approve (metadata only).
+    action=outreach: list drafted or sent emails. Without domain=, subjects/metadata
+    only. With domain=, PRINT that one full subject + body.
     action=approve / reject: needs outreach_id from queue (then send or discard).
-    action=stats: how many sent, how many got a reply, reply rate.
-    For full email bodies, pass domain= one site at a time (Telegram cannot fit many
-    full drafts in one tool result). If data.truncated or error=payload_too_large, do
-    not invent bodies — ask which domain to open, then call again with that domain=.
-    Never invent domains or claim an email was sent unless outreach/stats says so.
+    If data.truncated or error=payload_too_large: use the catalog silently for counts/
+    status. Only ask which domain to open if the founder explicitly wants to read a
+    draft. Never invent bodies/domains or claim an email was sent unless outreach/stats
+    says so.
 execution:
   python:
     path: links.py

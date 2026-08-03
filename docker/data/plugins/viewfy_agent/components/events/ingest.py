@@ -410,12 +410,14 @@ class IngestListener(EventListener):
                 return
             tg_id = str(event.sender_id)
             chat_id = str(event.launcher_id).split("#", 1)[0]
-            # Extend typing briefly in case another tool/LLM round follows.
-            self.plugin.start_typing(chat_id)
 
-            # Tool-call tracker lines ("Call foo...") — leave alone.
+            # Tool-call tracker lines ("Call foo...") — leave alone; keep typing.
             if text.startswith("Call ") and "..." in text:
+                self.plugin.start_typing(chat_id)
                 return
+
+            # Final user-visible reply — clear the typing indicator.
+            self.plugin.stop_typing(chat_id)
 
             # Lift webpage CTAs out of the body into Telegram inline buttons.
             # Skip fenced draft/code bodies for bare URLs; keep markdown links.

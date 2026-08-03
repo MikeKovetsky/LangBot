@@ -48,10 +48,11 @@ def _slim_links_outreach(out: dict[str, Any]) -> dict[str, Any]:
     domain_hint = ", ".join(domains[:8]) if domains else "a domain from the list"
     return {
         "summary": (
-            f"{len(catalog)} outreach draft(s) ready, but full bodies are too long for one "
-            f"Telegram tool result. Call again with domain=<one of: {domain_hint}> to print "
-            f"that full subject+body. Do not invent email text. A short note was already "
-            f"sent to the founder in chat."
+            f"{len(catalog)} outreach draft(s) listed (subjects only; bodies omitted — too large). "
+            f"Domains: {domain_hint}. Use this catalog for status/counts. "
+            f"Only if the founder asked to read a draft, call again with domain=<one domain> "
+            f"for full subject+body. Do not invent email text. Do not volunteer the "
+            f"payload-limit explanation unprompted."
         ),
         "data": {
             "action": data.get("action") or "outreach",
@@ -71,8 +72,8 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
     return {
         "summary": (
             f"{summary} Result was too large for one Telegram tool reply "
-            f"({tool_name}). Ask for a narrower slice (one domain / one id). "
-            f"A short note was already sent to the founder in chat."
+            f"({tool_name}). Narrow with one domain / one id if the founder asked "
+            f"for full detail. Do not volunteer a payload-limit explanation unprompted."
         ).strip(),
         "data": {
             "truncated": True,
@@ -104,45 +105,11 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
     return {
         "summary": (
             "Result was too large for one Telegram tool reply. "
-            "Ask for one domain or one id. A short note was sent in chat."
+            "Ask for one domain or one id only if the founder wants full detail."
         ),
         "data": {"truncated": True, "error": "payload_too_large", "tool": tool_name},
         "error": "payload_too_large",
     }, True
-
-
-async def _diegetic_too_large(
-    plugin, tool_name: str, chat_id: str, tg_id: str
-) -> None:
-    lang = plugin.lang_for(tg_id)
-    text = i18n.t(lang, "tool_payload_too_large")
-    chat = str(chat_id).split("#", 1)[0]
-    try:
-        out = await plugin._tg(
-            "sendMessage",
-            {
-                "chat_id": chat,
-                "text": text[:4000],
-                "disable_web_page_preview": True,
-                "link_preview_options": {"is_disabled": True},
-            },
-        )
-        if not out.get("ok"):
-            log.warning("diegetic too_large send failed: %s", out.get("description"))
-            return
-        await plugin.ingest(
-            telegram_user_id=str(tg_id),
-            telegram_chat_id=chat,
-            direction="out",
-            text=text,
-            meta={
-                "kind": "tool_payload_too_large",
-                "tool": tool_name,
-                "via": "tool_call",
-            },
-        )
-    except Exception:
-        log.exception("diegetic too_large failed tool=%s", tool_name)
 
 
 async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: str) -> str:
@@ -255,7 +222,6 @@ async def agent(plugin, tool_name: str, params: dict[str, Any] | None, session) 
                 tool_name,
                 (fitted.get("data") or {}).get("action") if isinstance(fitted.get("data"), dict) else None,
             )
-            await _diegetic_too_large(plugin, tool_name, chat_id, tg_id)
 
         return await _send_tool_cta(plugin, tool_name, _dumps(fitted), chat_id, tg_id)
     finally:
@@ -264,4 +230,4 @@ async def agent(plugin, tool_name: str, params: dict[str, Any] | None, session) 
             await pulse
         except asyncio.CancelledError:
             pass
-        plugin.start_typing(chat_id)
+        # Keep typing alive until the next LLM round (PromptPreProcessing) or final stop.

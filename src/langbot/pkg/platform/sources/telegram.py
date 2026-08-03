@@ -713,7 +713,8 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
         effective_message = update.effective_message
         message_thread_id = getattr(effective_message, 'message_thread_id', None) if effective_message else None
 
-        args = self._build_message_args(chat_id, 'Thinking...', message_thread_id)
+        # Language-neutral placeholder (client typing status is already localized).
+        args = self._build_message_args(chat_id, '💭', message_thread_id)
         send_msg = await self.bot.send_message(**args)
         self.msg_stream_id[message_id] = ('message', send_msg.message_id, False)
         self._cap_stream_states()
