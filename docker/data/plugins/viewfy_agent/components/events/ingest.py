@@ -29,6 +29,10 @@ FORMAT_LINE = (
     "Never invent a product URL. Call scrape only with a URL the founder typed in this chat; "
     "before creating a product, echo the exact URL and get a clear yes. Bare hey/@ pings are "
     "not consent to scrape. If unsure, ask. "
+    "Never claim you started, finished, or will perform a side effect unless you called a "
+    "writable tool that can do that side effect and it succeeded. If no listed tool can do "
+    "it, decline in one short line (do not say you are writing / shipping / give me a minute). "
+    "Read-only tools never count as doing the work. "
     "For users per day / site traffic / pageviews, call stats (Viewfy tracker). "
     "Never say you lack traffic metrics. Never ask for GA, Plausible, or Cloudflare Analytics. "
     "For inbox send: real subject, short body, low volume while warming (not blasts). "
@@ -37,7 +41,7 @@ FORMAT_LINE = (
     "status fields before claiming Cloudflare is not connected. "
     "For GitHub: call products (id) and read github.connected / github.repos before "
     "claiming no repo is linked. Connect with connect platform=github (Telegram button); "
-    "never invent Settings → Repository. "
+    "never invent Settings -> Repository. "
     "If the founder message is 'approve action_id=...' or 'reject action_id=...', call "
     "roam_approve with that id and decision immediately (skip roam_queue). "
     "If they type approve/reject without an id, call roam_queue then roam_approve. "
@@ -320,9 +324,14 @@ class IngestListener(EventListener):
             if chat_id:
                 self.plugin.start_typing(chat_id)
 
+            import side_effect
+
             prompts = list(event.default_prompt or [])
             if FORMAT_LINE not in _content_blob(prompts):
                 prompts.append(provider_message.Message(role="system", content=FORMAT_LINE))
+            caps = side_effect.capability_line()
+            if caps not in _content_blob(prompts):
+                prompts.append(provider_message.Message(role="system", content=caps))
             if is_group and GROUP_LINE not in _content_blob(prompts):
                 prompts.append(provider_message.Message(role="system", content=GROUP_LINE))
 
@@ -460,6 +469,47 @@ class IngestListener(EventListener):
                         "stream": "open_fence",
                         "funcs_called": list(event.funcs_called or []),
                         "lang": self.plugin.lang_for(tg_id),
+                        "group": str(getattr(event, "launcher_type", "") or "").startswith("group")
+                        or str(event.launcher_id).startswith("-"),
+                    },
+                )
+                return
+
+            import side_effect
+
+            funcs = list(event.funcs_called or [])
+            lang = self.plugin.lang_for(tg_id)
+            if side_effect.should_decline(text, funcs):
+                original = text
+                decline = side_effect.decline_text(lang)
+                sent = False
+                if getattr(self.plugin, "bot_token", None):
+                    out = await self.plugin._tg(
+                        "sendMessage",
+                        {
+                            "chat_id": chat_id,
+                            "text": decline[:4000],
+                            "disable_web_page_preview": True,
+                            "link_preview_options": {"is_disabled": True},
+                        },
+                    )
+                    sent = bool(out.get("ok"))
+                if sent:
+                    event_context.prevent_default()
+                else:
+                    # No bot token / send failed — still rewrite what LangBot would emit.
+                    event.response_text = decline
+                await self.plugin.ingest(
+                    telegram_user_id=tg_id,
+                    telegram_chat_id=chat_id,
+                    direction="out",
+                    text=decline,
+                    meta={
+                        "event": "NormalMessageResponded",
+                        "kind": "side_effect_declined",
+                        "blocked_text": original,
+                        "funcs_called": funcs,
+                        "lang": lang,
                         "group": str(getattr(event, "launcher_type", "") or "").startswith("group")
                         or str(event.launcher_id).startswith("-"),
                     },

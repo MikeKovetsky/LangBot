@@ -1,0 +1,136 @@
+"""Generic gate: do not claim side effects without a write-capable tool call.
+
+Tools mirror Viewfy agent scopes (write / dynamic can mutate; read never does).
+On a final Telegram reply that promises work-in-progress without such a tool,
+replace the lie with a short decline.
+"""
+from __future__ import annotations
+
+import re
+from typing import Iterable
+
+# Can perform a side effect (even if some actions on the tool are read-only).
+WRITE_CAPABLE: frozenset[str] = frozenset(
+    {
+        "scrape",
+        "audit",
+        "form_pr",
+        "variants",
+        "strategy",
+        "links",
+        "connect",
+        "inbox",
+        "roam",
+        "roam_session",
+        "roam_approve",
+        "group_pin",
+        "product_invite",
+        "product_members",
+    }
+)
+
+# Never mutate product state. Calling these does not authorize "I'm doing it".
+READ_ONLY: frozenset[str] = frozenset(
+    {
+        "products",
+        "issues",
+        "blog",
+        "campaigns",
+        "insights",
+        "stats",
+        "inbox_credentials",
+        "approvals",
+        "roam_queue",
+    }
+)
+
+# Claims of starting / performing work now (not suggestions / outlines).
+_PROMISE_RE = re.compile(
+    r"(?:"
+    # EN
+    r"\b(?:i(?:'m| am)|i'll|i will)\s+(?:just\s+)?(?:write|writing|draft|drafting|"
+    r"publish|publishing|create|creating|open|opening|send|sending|post|posting|"
+    r"ship|shipping|run|running|start|starting|queue|queuing|fix|fixing|"
+    r"deploy|deploying|launch|launching)\b"
+    r"|\b(?:give me a (?:sec|second|minute|moment)|one (?:sec|second|minute|moment)|"
+    r"hang on|working on it)\b"
+    # UA
+    r"|\b(?:пишу|напишу|пишуся|запускаю|запущу|створюю|створю|відправляю|відправлю|"
+    r"публікую|опублікую|роблю|зроблю|чекай|зачекай|хвилин|хвилину|секунду|"
+    r"дай\s+(?:хвилин|секунд))\b"
+    # RU
+    r"|\b(?:пишу|напишу|запускаю|запущу|создаю|создам|отправляю|отправлю|"
+    r"публикую|опубликую|делаю|сделаю|подожди|секунду|минуту|"
+    r"дай\s+(?:минут|секунд))\b"
+    r")",
+    re.IGNORECASE,
+)
+
+# Soft suggestions / topic ideas — not a claim of doing the work.
+_SUGGEST_RE = re.compile(
+    r"(?:"
+    r"\b(?:you (?:could|can|should)|we could|ideas?|outline|topics?|можно написати|"
+    r"про що|що зайде|резонує|можу накидати)\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def capability_line() -> str:
+    writable = ", ".join(sorted(WRITE_CAPABLE))
+    readonly = ", ".join(sorted(READ_ONLY))
+    return (
+        "Tool capabilities: "
+        f"writable/side-effect tools = [{writable}]; "
+        f"read-only = [{readonly}]. "
+        "Never claim you started, finished, or will perform a side effect unless you "
+        "called a writable tool that can do that side effect and it succeeded. "
+        "If no listed tool can do it, decline in one short line. "
+        "Read-only tools never count as doing the work."
+    )
+
+
+def is_side_effect_promise(text: str) -> bool:
+    t = (text or "").strip()
+    if not t or len(t) > 800:
+        # Long outlines are not "I'm writing now" promises.
+        return False
+    if not _PROMISE_RE.search(t):
+        return False
+    # "можу накидати outline" / topic lists with a soft CTA — allow.
+    if _SUGGEST_RE.search(t) and not re.search(
+        r"(?i)\b(?:пишу|i(?:'m| am) writing|дай хвилин|give me a)\b", t
+    ):
+        return False
+    return True
+
+
+def called_write_capable(funcs: Iterable[str] | None) -> bool:
+    names = {str(f).strip() for f in (funcs or []) if str(f).strip()}
+    return bool(names & WRITE_CAPABLE)
+
+
+def should_decline(text: str, funcs_called: Iterable[str] | None) -> bool:
+    if not is_side_effect_promise(text):
+        return False
+    return not called_write_capable(funcs_called)
+
+
+DECLINE = {
+    "en": (
+        "I can't do that from chat — there's no tool that performs that action. "
+        "Ask for something I can run with the tools I have, or do it in the dashboard."
+    ),
+    "ua": (
+        "З чату це не зроблю — немає інструмента, який виконує таку дію. "
+        "Попроси те, що я можу запустити тулами, або зроби в дашборді."
+    ),
+    "ru": (
+        "Из чата это не сделаю — нет инструмента, который выполняет такое действие. "
+        "Попроси то, что я могу запустить тулами, или сделай в дашборде."
+    ),
+}
+
+
+def decline_text(lang: str) -> str:
+    return DECLINE.get(lang) or DECLINE["en"]

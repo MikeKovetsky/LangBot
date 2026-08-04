@@ -10,7 +10,7 @@ metadata:
     zh_Hans: List blog posts for a product, or get one by post_id. Includes Cloudflare/DNS host status.
 spec:
   parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "post_id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: List blog posts for a product, or get one by post_id. Response includes host.cloudflare / dns_status — use that before claiming Cloudflare is not connected.
+  llm_prompt: Read-only. List blog posts or get one by post_id. Cannot create or write posts. If the founder asks you to write a post, decline. Response includes host.cloudflare / dns_status - use that before claiming Cloudflare is not connected.
 execution:
   python:
     path: blog.py
