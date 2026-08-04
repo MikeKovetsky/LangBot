@@ -144,6 +144,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "open_btn": "Open",
         "approve_btn": "Approve",
         "reject_btn": "Reject",
+        "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
             "Couldn't create a connect link right now. "
@@ -179,6 +180,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "open_btn": "Відкрити",
         "approve_btn": "Approve",
         "reject_btn": "Reject",
+        "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
             "Не вдалося створити посилання зараз. "
@@ -214,6 +216,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "open_btn": "Открыть",
         "approve_btn": "Approve",
         "reject_btn": "Reject",
+        "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (
             "Не удалось создать ссылку сейчас. "

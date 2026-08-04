@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import asyncio
-import html
 import json
 import logging
-import re
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,38 +18,59 @@ REWRITE_SYSTEM = """You are Viewfy, chatting with a young YC founder over Telegr
 Voice: peer founder, not coach or corporate SaaS. Short, direct, slightly sharp.
 Casual but not cringe. No hype adjectives. No LinkedIn energy.
 
-You are rewriting an INTERNAL event into a short chat update for the founder.
+You are rewriting an INTERNAL event into a chat update for the founder.
 Rules:
-- Keep replies tight: 1-2 short lines for the intro only.
 - First line is what happened. No preamble. No "Great news!".
 - Diegetic only: never show UUIDs, internal ids, status enums, action_id, or JSON keys.
 - Talk in product names, domains, and channel names (HN, Reddit, etc.).
 - Do NOT include the draft body. Do NOT invent draft text. Framing only.
-- If needs_approval is true, say a draft is ready. Do not say "reply approve or reject"
-  (Approve/Reject buttons are attached).
+- Do NOT invent numbers. Only report counts present in facts_json. Omit zero/missing sections.
+- If needs_approval is true (and kind is not daily_digest), say a draft is ready. Do not say
+  "reply approve or reject" (Approve/Reject buttons are attached).
 - If kind is product_invite_accepted / outcome accepted: say they are in on the product, briefly.
 - If kind is pr_ready / outcome open: say the SEO fix PR is live on GitHub. Do not paste the URL
   (a button is attached). Mention repo or PR number lightly if useful.
+- If kind is daily_digest / outcome morning: this is the morning report. Open like
+  "morning. here is {day}, while you were shipping." then short lines for each non-empty
+  section (visitors, signups, citations, post, ads total, link building, sales, roam).
+  Keep link and sales clearly separate. If needs_you is present, end with what needs them;
+  otherwise close with go build. Quiet day if almost nothing landed.
+- For non-digest kinds: keep replies tight, 1-2 short lines.
 - On failure: say what blocked and the next move, plainly.
 - Celebrate real wins lightly with 🎉. Occasional blue emoji ok. No spam.
 - Never use em dashes or en dashes. Use comma, period, colon, or ASCII hyphen (-).
-- Output ONLY the intro text. No quotes, no markdown fences, no labels, no links
+- Output ONLY the chat text. No quotes, no markdown fences, no labels, no links
   (the sender appends the draft and buttons separately).
 """
 
 
-def _facts_user_message(kind: str, payload: dict[str, Any]) -> str:
+def _facts_user_message(kind: str, payload: dict[str, Any], lang: str) -> str:
+    import i18n
+
     # Strip fields the rewriter must not paraphrase into chat.
     safe = {
         k: v
         for k, v in payload.items()
         if k not in ("draft_text", "action_id")
     }
+    if kind == "daily_digest":
+        shape = (
+            "Rewrite these facts into a complete morning Telegram report "
+            "(greeting + one short line per non-empty section). "
+            "Do not invent metrics."
+        )
+        max_hint = "Aim for under ~12 short lines."
+    else:
+        shape = "Rewrite these facts into a short diegetic Telegram intro (1-2 lines)."
+        max_hint = ""
+    lang_line = i18n.prompt_lang_line(lang)
     return (
-        "Rewrite these facts into a short diegetic Telegram intro (1-2 lines).\n"
+        f"{shape}\n"
+        f"{lang_line}\n"
+        f"{max_hint}\n"
         f"kind: {kind}\n"
         f"facts_json: {json.dumps(safe, ensure_ascii=False)}"
-    )
+    ).strip()
 
 
 def _compose_approval(intro: str, payload: dict[str, Any]) -> str:
@@ -66,49 +85,35 @@ def _compose_approval(intro: str, payload: dict[str, Any]) -> str:
     return "\n".join(parts).strip()
 
 
-def _html_inline(s: str) -> str:
-    """Escape then apply markdown-ish link/bold on a non-code segment."""
-    parts: list[str] = []
-    pos = 0
-    for m in re.finditer(r"\[([^\]]+)\]\((https?://[^)]+)\)|\*\*(.+?)\*\*", s):
-        parts.append(html.escape(s[pos:m.start()]))
-        if m.group(1) is not None:
-            parts.append(
-                f'<a href="{html.escape(m.group(2), quote=True)}">{html.escape(m.group(1))}</a>'
-            )
-        else:
-            parts.append(f"<b>{html.escape(m.group(3))}</b>")
-        pos = m.end()
-    parts.append(html.escape(s[pos:]))
-    return "".join(parts)
-
-
-def _html_from_markdownish(text: str) -> str:
-    """Best-effort HTML for Telegram parse_mode=HTML (links + pre + bold)."""
-    out: list[str] = []
-    pos = 0
-    for m in re.finditer(r"```(?:\w+)?\n(.*?)```", text, flags=re.DOTALL):
-        out.append(_html_inline(text[pos:m.start()]))
-        out.append(f"<pre>{html.escape(m.group(1))}</pre>")
-        pos = m.end()
-    out.append(_html_inline(text[pos:]))
-    return "".join(out)
-
-
-async def rewrite(plugin: ViewfyAgentPlugin, kind: str, payload: dict[str, Any]) -> str:
+async def rewrite(
+    plugin: ViewfyAgentPlugin,
+    kind: str,
+    payload: dict[str, Any],
+    *,
+    lang: str = "en",
+) -> str:
     from langbot_plugin.api.entities.builtin.provider import message as provider_message
+    import i18n
 
     model = (plugin.llm_model_uuid or "").strip()
     if not model:
         raise RuntimeError("llm_model_uuid not configured")
 
+    lang_n = i18n.normalize_lang(lang)
+    system = REWRITE_SYSTEM
+    if lang_n != "en":
+        system = system.rstrip() + "\n\n" + i18n.prompt_lang_line(lang_n)
+
+    max_tokens = 420 if kind == "daily_digest" else 180
     msg = await plugin.invoke_llm(
         llm_model_uuid=model,
         messages=[
-            provider_message.Message(role="system", content=REWRITE_SYSTEM),
-            provider_message.Message(role="user", content=_facts_user_message(kind, payload)),
+            provider_message.Message(role="system", content=system),
+            provider_message.Message(
+                role="user", content=_facts_user_message(kind, payload, lang_n)
+            ),
         ],
-        extra_args={"temperature": 0.6, "max_tokens": 180},
+        extra_args={"temperature": 0.6, "max_tokens": max_tokens},
     )
     text = (msg.content or "").strip() if hasattr(msg, "content") else str(msg).strip()
     if isinstance(text, list):
@@ -127,10 +132,16 @@ async def rewrite(plugin: ViewfyAgentPlugin, kind: str, payload: dict[str, Any])
     for bad in ("action_id",):
         if bad in text:
             text = text.replace(bad, "")
-    return text[:800]
+    limit = 2000 if kind == "daily_digest" else 800
+    return text[:limit]
 
 
-def _build_markup(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
+def _build_markup(
+    payload: dict[str, Any],
+    lang: str,
+    *,
+    kind: str = "",
+) -> dict[str, Any] | None:
     import cta
     import i18n
 
@@ -140,6 +151,19 @@ def _build_markup(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
     if button_url.startswith("https://"):
         key = payload.get("button_key") or "pr_btn"
         rows.append([cta.url_btn(i18n.t(lang, key), button_url)])
+
+    # Morning digest: one Review drafts CTA → unified approvals queue (all motions).
+    if kind == "daily_digest":
+        product_id = (payload.get("product_id") or "").strip()
+        if payload.get("needs_approval") and product_id:
+            rows.append([
+                cta.cb_btn(
+                    i18n.t(lang, "review_drafts_btn"),
+                    f"vf:queue:{product_id}",
+                    style="primary",
+                )
+            ])
+        return cta.keyboard(rows) if rows else None
 
     target_url = (payload.get("target_url") or "").strip()
     if (
@@ -165,17 +189,22 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
 
     payload = item.get("payload") or {}
     kind = item.get("kind") or "report"
-    intro = await rewrite(plugin, kind, payload)
+    tg_uid = str(item["telegram_user_id"])
+    chat_id = str(item.get("telegram_chat_id") or tg_uid)
+    lang = plugin.lang_for(tg_uid)
+    intro = await rewrite(plugin, kind, payload, lang=lang)
 
-    if payload.get("needs_approval") and (payload.get("draft_text") or "").strip():
+    if (
+        kind != "daily_digest"
+        and payload.get("needs_approval")
+        and (payload.get("draft_text") or "").strip()
+    ):
         text = _compose_approval(intro, payload)
     else:
         text = intro
 
-    tg_uid = str(item["telegram_user_id"])
-    chat_id = str(item.get("telegram_chat_id") or tg_uid)
-    lang = plugin.lang_for(tg_uid)
-    markup = _build_markup(payload, lang)
+    # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on roam.
+    markup = _build_markup(payload, lang, kind=kind)
 
     # Prefer Bot API HTML so links + preformatted draft render even without markdown_card.
     sent = False
@@ -187,7 +216,7 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
             body_text = cta.strip_urls(text) or text
         body: dict[str, Any] = {
             "chat_id": chat_id,
-            "text": _html_from_markdownish(body_text)[:4000],
+            "text": cta.html_from_markdownish(body_text)[:4000],
             "parse_mode": "HTML",
             "disable_web_page_preview": True,
         }

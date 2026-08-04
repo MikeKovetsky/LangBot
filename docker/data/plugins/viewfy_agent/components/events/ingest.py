@@ -37,7 +37,9 @@ FORMAT_LINE = (
     "status fields before claiming Cloudflare is not connected. "
     "If the founder message is 'approve action_id=...' or 'reject action_id=...', call "
     "roam_approve with that id and decision immediately (skip roam_queue). "
-    "If they type approve/reject without an id, call roam_queue then roam_approve."
+    "If they type approve/reject without an id, call roam_queue then roam_approve. "
+    "If the founder message is 'show approvals product_id=...', call approvals with that "
+    "product_id immediately and list every pending draft (link, sales, roam)."
 )
 
 GROUP_LINE = (

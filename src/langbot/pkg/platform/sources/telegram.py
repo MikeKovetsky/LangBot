@@ -404,14 +404,15 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             await query.answer()
             try:
                 raw = (query.data or '').strip()
-                # Viewfy inline CTAs: vf:approve:<uuid> / vf:reject:<uuid>
-                if raw.startswith('vf:approve:') or raw.startswith('vf:reject:'):
+                # Viewfy inline CTAs:
+                #   vf:approve:<uuid> / vf:reject:<uuid> — roam draft decisions
+                #   vf:queue:<product_uuid> — morning digest → unified approvals
+                if (
+                    raw.startswith('vf:approve:')
+                    or raw.startswith('vf:reject:')
+                    or raw.startswith('vf:queue:')
+                ):
                     import langbot_plugin.api.entities.builtin.provider.session as provider_session
-
-                    decision = 'approve' if raw.startswith('vf:approve:') else 'reject'
-                    action_id = raw.split(':', 2)[2].strip()
-                    if not action_id:
-                        return
 
                     user_id = str(query.from_user.id)
                     chat = query.message.chat if query.message else None
@@ -433,19 +434,35 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
                             pipeline_uuid = b.bot_entity.use_pipeline_uuid
                             break
 
-                    # Diegetic label in chat edit; LLM gets action_id for roam_approve.
-                    try:
-                        mark = '✅' if decision == 'approve' else '✕'
-                        original_text = query.message.text or ''
-                        await query.edit_message_text(
-                            text=f'{original_text}\n\n{mark} {decision.capitalize()}',
-                            reply_markup=None,
-                        )
-                    except Exception:
-                        pass
+                    if raw.startswith('vf:queue:'):
+                        product_id = raw.split(':', 2)[2].strip()
+                        if not product_id:
+                            return
+                        # Keep morning report body; drop the Review drafts button.
+                        try:
+                            await query.edit_message_reply_markup(reply_markup=None)
+                        except Exception:
+                            pass
+                        inject_text = f'show approvals product_id={product_id}'
+                    else:
+                        decision = 'approve' if raw.startswith('vf:approve:') else 'reject'
+                        action_id = raw.split(':', 2)[2].strip()
+                        if not action_id:
+                            return
+                        # Diegetic label in chat edit; LLM gets action_id for roam_approve.
+                        try:
+                            mark = '✅' if decision == 'approve' else '✕'
+                            original_text = query.message.text or ''
+                            await query.edit_message_text(
+                                text=f'{original_text}\n\n{mark} {decision.capitalize()}',
+                                reply_markup=None,
+                            )
+                        except Exception:
+                            pass
+                        inject_text = f'{decision} action_id={action_id}'
 
                     message_chain = platform_message.MessageChain(
-                        [platform_message.Plain(text=f'{decision} action_id={action_id}')]
+                        [platform_message.Plain(text=inject_text)]
                     )
                     if is_group:
                         synthetic_event = platform_events.GroupMessage(
