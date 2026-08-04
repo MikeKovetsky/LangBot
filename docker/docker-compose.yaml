@@ -95,6 +95,15 @@ services:
       # Unified env-override convention: SECTION__SUBSECTION__KEY overrides the
       # matching config.yaml field (see LoadConfigStage). These map onto
       # box.* and are forwarded to the Box runtime via INIT RPC.
+      #
+      # Box is off: the `box` compose profile is not enabled, so langbot_box never
+      # starts and LangBot otherwise retries ws://langbot_box:5410 every 60s
+      # forever. Nothing here needs it - plugins run in langbot_plugin_runtime, and
+      # Box only adds sandbox tools and stdio MCP. Turning it on also means mounting
+      # the host Docker socket, which is real privilege for capability we do not use.
+      # To enable: generate LANGBOT_BOX_CONTROL_TOKEN, flip this to true, and run
+      # `docker compose --profile box up -d`.
+      - BOX__ENABLED=${LANGBOT_BOX_ENABLED:-false}
       - BOX__LOCAL__HOST_ROOT=${LANGBOT_BOX_ROOT:-${PWD}/data/box}
       - BOX__LOCAL__DEFAULT_WORKSPACE=default
       - BOX__LOCAL__SKILLS_ROOT=skills
