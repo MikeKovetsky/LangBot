@@ -419,9 +419,49 @@ class IngestListener(EventListener):
             # Final user-visible reply — clear the typing indicator.
             self.plugin.stop_typing(chat_id)
 
+            # Mid-stream chunks: ingest only. CTA hijack on a partial reply
+            # (open ``` fence) was sending a plain-text duplicate.
+            query = getattr(event, "query", None)
+            msgs = getattr(query, "resp_messages", None) if query else None
+            last = msgs[-1] if msgs else None
+            if last is not None and hasattr(last, "is_final") and not last.is_final:
+                await self.plugin.ingest(
+                    telegram_user_id=tg_id,
+                    telegram_chat_id=chat_id,
+                    direction="out",
+                    text=text,
+                    meta={
+                        "event": "NormalMessageResponded",
+                        "stream": "partial",
+                        "funcs_called": list(event.funcs_called or []),
+                        "lang": self.plugin.lang_for(tg_id),
+                        "group": str(getattr(event, "launcher_type", "") or "").startswith("group")
+                        or str(event.launcher_id).startswith("-"),
+                    },
+                )
+                return
+
             # Lift webpage CTAs out of the body into Telegram inline buttons.
             # Skip fenced draft/code bodies for bare URLs; keep markdown links.
-            outside = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+            # Also bail if a fence is still open (stream edge / missing is_final).
+            if not cta.fences_balanced(text):
+                await self.plugin.ingest(
+                    telegram_user_id=tg_id,
+                    telegram_chat_id=chat_id,
+                    direction="out",
+                    text=text,
+                    meta={
+                        "event": "NormalMessageResponded",
+                        "stream": "open_fence",
+                        "funcs_called": list(event.funcs_called or []),
+                        "lang": self.plugin.lang_for(tg_id),
+                        "group": str(getattr(event, "launcher_type", "") or "").startswith("group")
+                        or str(event.launcher_id).startswith("-"),
+                    },
+                )
+                return
+
+            outside = cta.outside_fences(text)
             links = cta.extract_links(outside)
             if links and getattr(self.plugin, "bot_token", None):
                 lang = self.plugin.lang_for(tg_id)

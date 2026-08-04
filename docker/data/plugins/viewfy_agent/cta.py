@@ -1,6 +1,7 @@
 """Telegram inline CTA helpers (URL + callback buttons)."""
 from __future__ import annotations
 
+import html
 import logging
 import re
 from typing import Any
@@ -9,6 +10,48 @@ log = logging.getLogger("viewfy_agent.cta")
 
 _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 _BARE_URL_RE = re.compile(r"(?<![\(\[])(https?://[^\s<>\]\)]+)")
+_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
+
+
+def fences_balanced(text: str) -> bool:
+    """False while a streamed reply still has an open ``` fence."""
+    return (text or "").count("```") % 2 == 0
+
+
+def outside_fences(text: str) -> str:
+    """Strip complete fenced blocks; empty if a fence is still open."""
+    if not fences_balanced(text):
+        return ""
+    return _FENCE_RE.sub("", text or "")
+
+
+def _html_inline(s: str) -> str:
+    """Escape then apply markdown-ish link/bold on a non-code segment."""
+    parts: list[str] = []
+    pos = 0
+    for m in re.finditer(r"\[([^\]]+)\]\((https?://[^)]+)\)|\*\*(.+?)\*\*", s):
+        parts.append(html.escape(s[pos : m.start()]))
+        if m.group(1) is not None:
+            parts.append(
+                f'<a href="{html.escape(m.group(2), quote=True)}">{html.escape(m.group(1))}</a>'
+            )
+        else:
+            parts.append(f"<b>{html.escape(m.group(3))}</b>")
+        pos = m.end()
+    parts.append(html.escape(s[pos:]))
+    return "".join(parts)
+
+
+def html_from_markdownish(text: str) -> str:
+    """Best-effort HTML for Telegram parse_mode=HTML (links + pre + bold)."""
+    out: list[str] = []
+    pos = 0
+    for m in re.finditer(r"```(?:\w+)?\n(.*?)```", text or "", flags=re.DOTALL):
+        out.append(_html_inline(text[pos : m.start()]))
+        out.append(f"<pre>{html.escape(m.group(1))}</pre>")
+        pos = m.end()
+    out.append(_html_inline((text or "")[pos:]))
+    return "".join(out)
 
 # Tools that return a CTA url in data.
 TOOL_CTA = {
@@ -115,25 +158,52 @@ async def send(
     text: str,
     buttons: list[list[dict[str, Any]]],
     *,
-    parse_mode: str | None = None,
+    parse_mode: str | None = "HTML",
 ) -> bool:
-    """Send copy + inline keyboard. Strips https from text when buttons carry URLs."""
+    """Send copy + inline keyboard. Strips https from text when buttons carry URLs.
+
+    Defaults to HTML so **bold** / fenced drafts render (same path as outbox).
+    """
     if not getattr(plugin, "bot_token", None):
         return False
     body_text = strip_urls(text) if any("url" in b for row in buttons for b in row) else (text or "").strip()
     if not body_text:
         body_text = "👇"
+    chat = str(chat_id).split("#", 1)[0]
+    markup = keyboard(buttons)
+    payload_text = (
+        html_from_markdownish(body_text)[:4000]
+        if parse_mode == "HTML"
+        else body_text[:4000]
+    )
     body: dict[str, Any] = {
-        "chat_id": str(chat_id).split("#", 1)[0],
-        "text": body_text[:4000],
+        "chat_id": chat,
+        "text": payload_text,
         "disable_web_page_preview": True,
         "link_preview_options": {"is_disabled": True},
-        "reply_markup": keyboard(buttons),
+        "reply_markup": markup,
     }
     if parse_mode:
         body["parse_mode"] = parse_mode
     out = await plugin._tg("sendMessage", body)
-    if not out.get("ok"):
-        log.warning("CTA send failed: %s", out.get("description"))
-        return False
-    return True
+    if out.get("ok"):
+        return True
+    # Bad HTML entities → retry plain so the CTA still lands.
+    if parse_mode:
+        log.warning(
+            "CTA %s send failed (%s); retrying plain",
+            parse_mode,
+            out.get("description"),
+        )
+        plain = {
+            "chat_id": chat,
+            "text": body_text[:4000],
+            "disable_web_page_preview": True,
+            "link_preview_options": {"is_disabled": True},
+            "reply_markup": markup,
+        }
+        out = await plugin._tg("sendMessage", plain)
+        if out.get("ok"):
+            return True
+    log.warning("CTA send failed: %s", out.get("description"))
+    return False
