@@ -109,6 +109,9 @@ class ResponseWrapper(stage.PipelineStage):
                         reply_text = str(result.get_content_platform_message_chain())
 
                         # ============= 触发插件事件 ===============
+                        # Plugins run out-of-process and never receive `query` (it is
+                        # excluded from the event model), so finish_reason is their only
+                        # signal for "terminal answer" vs "mid-stream chunk / tool round".
                         event = events.NormalMessageResponded(
                             launcher_type=query.launcher_type.value,
                             launcher_id=query.launcher_id,
@@ -116,7 +119,7 @@ class ResponseWrapper(stage.PipelineStage):
                             session=session,
                             prefix='',
                             response_text=reply_text,
-                            finish_reason='stop',
+                            finish_reason='stop' if self._is_final_assistant_message(result) else 'partial',
                             funcs_called=[fc.function.name for fc in result.tool_calls]
                             if result.tool_calls is not None
                             else [],
@@ -176,7 +179,8 @@ class ResponseWrapper(stage.PipelineStage):
                                 session=session,
                                 prefix='',
                                 response_text=reply_text,
-                                finish_reason='stop',
+                                # A tool-call tracker line is never the terminal answer.
+                                finish_reason='partial',
                                 funcs_called=[fc.function.name for fc in result.tool_calls]
                                 if result.tool_calls is not None
                                 else [],

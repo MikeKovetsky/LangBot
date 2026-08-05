@@ -31,8 +31,8 @@ FORMAT_LINE = (
     "not consent to scrape. If unsure, ask. "
     "Never claim you started, finished, or will perform a side effect unless you called a "
     "writable tool that can do that side effect and it succeeded. If no listed tool can do "
-    "it, decline in one short line (do not say you are writing / shipping / give me a minute). "
-    "Read-only tools never count as doing the work. "
+    "it, decline in one short line. Read-only tools never count as doing the work — but "
+    "reading, reviewing, and comparing what they return is work you can do. "
     "For users per day / site traffic / pageviews, call stats (Viewfy tracker). "
     "Never say you lack traffic metrics. Never ask for GA, Plausible, or Cloudflare Analytics. "
     "For inbox send: real subject, short body, low volume while warming (not blasts). "
@@ -173,6 +173,7 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
 
     tg_id = str(event.sender_id)
     chat_id = str(event.launcher_id).split("#", 1)[0]
+    plugin.turn_start(chat_id)
     lang = plugin.remember_lang(
         tg_id,
         i18n.resolve_lang(
@@ -425,6 +426,12 @@ class IngestListener(EventListener):
             tg_id = str(event.sender_id)
             chat_id = str(event.launcher_id).split("#", 1)[0]
 
+            funcs = list(event.funcs_called or [])
+            turn = self.plugin.turn_state(chat_id)
+            # Only round-final chunks carry tool_calls, and the terminal answer
+            # carries none — so the turn's tools accrue here, one event at a time.
+            turn["tools"].update(funcs)
+
             # Tool-call tracker lines ("Call foo...") — leave alone; keep typing.
             if text.startswith("Call ") and "..." in text:
                 self.plugin.start_typing(chat_id)
@@ -433,12 +440,10 @@ class IngestListener(EventListener):
             # Final user-visible reply — clear the typing indicator.
             self.plugin.stop_typing(chat_id)
 
-            # Mid-stream chunks: ingest only. CTA hijack on a partial reply
-            # (open ``` fence) was sending a plain-text duplicate.
-            query = getattr(event, "query", None)
-            msgs = getattr(query, "resp_messages", None) if query else None
-            last = msgs[-1] if msgs else None
-            if last is not None and hasattr(last, "is_final") and not last.is_final:
+            # Mid-stream chunks and tool rounds: ingest only. `event.query` is
+            # excluded from the event model out-of-process, so finish_reason is
+            # the only finality signal we get (LangBot wrapper sets it).
+            if str(getattr(event, "finish_reason", "stop") or "stop") != "stop":
                 await self.plugin.ingest(
                     telegram_user_id=tg_id,
                     telegram_chat_id=chat_id,
@@ -457,7 +462,7 @@ class IngestListener(EventListener):
 
             # Lift webpage CTAs out of the body into Telegram inline buttons.
             # Skip fenced draft/code bodies for bare URLs; keep markdown links.
-            # Also bail if a fence is still open (stream edge / missing is_final).
+            # Also bail if a fence is still open (stream edge).
             if not cta.fences_balanced(text):
                 await self.plugin.ingest(
                     telegram_user_id=tg_id,
@@ -477,9 +482,9 @@ class IngestListener(EventListener):
 
             import side_effect
 
-            funcs = list(event.funcs_called or [])
             lang = self.plugin.lang_for(tg_id)
-            if side_effect.should_decline(text, funcs):
+            if not turn["declined"] and side_effect.should_decline(text, turn["tools"]):
+                turn["declined"] = True
                 original = text
                 decline = side_effect.decline_text(lang)
                 sent = False
@@ -508,7 +513,7 @@ class IngestListener(EventListener):
                         "event": "NormalMessageResponded",
                         "kind": "side_effect_declined",
                         "blocked_text": original,
-                        "funcs_called": funcs,
+                        "funcs_called": sorted(turn["tools"]),
                         "lang": lang,
                         "group": str(getattr(event, "launcher_type", "") or "").startswith("group")
                         or str(event.launcher_id).startswith("-"),
@@ -519,7 +524,6 @@ class IngestListener(EventListener):
             outside = cta.outside_fences(text)
             links = cta.extract_links(outside)
             if links and getattr(self.plugin, "bot_token", None):
-                lang = self.plugin.lang_for(tg_id)
                 rows = []
                 for label, url in links[:3]:
                     low = label.lower()

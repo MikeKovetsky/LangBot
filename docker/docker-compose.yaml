@@ -78,6 +78,9 @@ services:
       - ../src/langbot/pkg/platform/sources/telegram.py:/app/src/langbot/pkg/platform/sources/telegram.py:ro
       # Dogfood: hard wall-clock ceiling on wedged Anthropic/LiteLLM calls.
       - ../src/langbot/pkg/provider/modelmgr/requesters/litellmchat.py:/app/src/langbot/pkg/provider/modelmgr/requesters/litellmchat.py:ro
+      # Dogfood: truthful finish_reason so out-of-process plugins can tell a
+      # terminal answer from a stream chunk (they never receive `query`).
+      - ../src/langbot/pkg/pipeline/wrapper/wrapper.py:/app/src/langbot/pkg/pipeline/wrapper/wrapper.py:ro
     restart: on-failure
     environment:
       - TZ=Asia/Shanghai

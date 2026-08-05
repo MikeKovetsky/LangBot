@@ -66,6 +66,7 @@ class ViewfyAgentPlugin(BasePlugin):
         self._load_user_lang()
         self._typing_until: dict[str, float] = {}  # chat_id -> monotonic deadline
         self._typing_tasks: dict[str, asyncio.Task] = {}
+        self._turn: dict[str, dict[str, Any]] = {}  # chat_id -> side-effect gate state
         self._outbox_task: asyncio.Task | None = None
         if self.bot_token and self.sticker_set:
             await self._load_stickers()
@@ -126,6 +127,22 @@ class ViewfyAgentPlugin(BasePlugin):
 
     def lang_for(self, telegram_user_id: str) -> str:
         return self.user_lang.get(str(telegram_user_id), "en")
+
+    def turn_start(self, chat_id: str | int | None) -> None:
+        """New inbound message — reset what the side-effect gate knows about this chat.
+
+        One reply is many NormalMessageResponded events (a stream chunk, a tool
+        round). Tools called anywhere in the turn count, and the gate speaks once.
+        """
+        key = str(chat_id or "").split("#", 1)[0]
+        if key:
+            self._turn[key] = {"tools": set(), "declined": False}
+
+    def turn_state(self, chat_id: str | int | None) -> dict[str, Any]:
+        key = str(chat_id or "").split("#", 1)[0]
+        if not key:
+            return {"tools": set(), "declined": False}
+        return self._turn.setdefault(key, {"tools": set(), "declined": False})
 
     def start_typing(self, chat_id: str | int | None) -> None:
         """Show Telegram 'typing…' and keep refreshing until idle."""

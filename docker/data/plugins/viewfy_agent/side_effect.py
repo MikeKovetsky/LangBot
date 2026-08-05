@@ -1,8 +1,16 @@
 """Generic gate: do not claim side effects without a write-capable tool call.
 
 Tools mirror Viewfy agent scopes (write / dynamic can mutate; read never does).
-On a final Telegram reply that promises work-in-progress without such a tool,
-replace the lie with a short decline.
+On a final Telegram reply that claims a mutation without such a tool, replace the
+lie with a short decline.
+
+Two rules keep this from firing on honest replies:
+
+- Only mutation verbs count. "Let me read these and pick the best" is real work
+  the read tools perform; a bare "one sec" is not a claim to have done anything.
+- `funcs_called` must be the union over the whole user turn, not one chunk. The
+  terminal message never carries tool_calls, and the tool that satisfies the
+  promise usually ran a round or two earlier.
 """
 from __future__ import annotations
 
@@ -26,6 +34,9 @@ WRITE_CAPABLE: frozenset[str] = frozenset(
         "group_pin",
         "product_invite",
         "product_members",
+        # blog.yaml exposes action=write/update/status, so "publishing it now" can
+        # be true. Move it back to READ_ONLY if that tool goes back to list/get.
+        "blog",
     }
 )
 
@@ -34,7 +45,6 @@ READ_ONLY: frozenset[str] = frozenset(
     {
         "products",
         "issues",
-        "blog",
         "campaigns",
         "insights",
         "stats",
@@ -44,24 +54,25 @@ READ_ONLY: frozenset[str] = frozenset(
     }
 )
 
-# Claims of starting / performing work now (not suggestions / outlines).
+# Claims of performing a mutation now. Reading, reviewing, and picking are not
+# mutations, and "секунду / one sec" on its own claims nothing.
 _PROMISE_RE = re.compile(
     r"(?:"
     # EN
-    r"\b(?:i(?:'m| am)|i'll|i will)\s+(?:just\s+)?(?:write|writing|draft|drafting|"
-    r"publish|publishing|create|creating|open|opening|send|sending|post|posting|"
-    r"ship|shipping|run|running|start|starting|queue|queuing|fix|fixing|"
-    r"deploy|deploying|launch|launching)\b"
-    r"|\b(?:give me a (?:sec|second|minute|moment)|one (?:sec|second|minute|moment)|"
-    r"hang on|working on it)\b"
+    r"\b(?:i(?:'m| am)|i'll|i will)\s+(?:just\s+|now\s+)?(?:"
+    r"writ(?:e|ing)|draft(?:ing)?|publish(?:ing)?|creat(?:e|ing)|send(?:ing)?|"
+    r"post(?:ing)?|ship(?:ping)?|queu(?:e|ing)|deploy(?:ing)?|launch(?:ing)?|"
+    r"approv(?:e|ing)|reject(?:ing)?|fix(?:ing)?|start(?:ing)?|runn?(?:ing)?"
+    r")\b"
+    # "opening" only counts for things we actually open.
+    r"|\b(?:i(?:'m| am)|i'll|i will)\s+open(?:ing)?\s+(?:[\w-]+\s+){0,3}"
+    r"(?:pr\b|pull request|issue|ticket)"
     # UA
-    r"|\b(?:пишу|напишу|пишуся|запускаю|запущу|створюю|створю|відправляю|відправлю|"
-    r"публікую|опублікую|роблю|зроблю|чекай|зачекай|хвилин|хвилину|секунду|"
-    r"дай\s+(?:хвилин|секунд))\b"
+    r"|\b(?:пишу|напишу|запускаю|запущу|створюю|створю|відправляю|відправлю|"
+    r"публікую|опублікую|апрувлю|заапрувлю|реджектну)\b"
     # RU
     r"|\b(?:пишу|напишу|запускаю|запущу|создаю|создам|отправляю|отправлю|"
-    r"публикую|опубликую|делаю|сделаю|подожди|секунду|минуту|"
-    r"дай\s+(?:минут|секунд))\b"
+    r"публикую|опубликую|апрувлю)\b"
     r")",
     re.IGNORECASE,
 )
@@ -86,7 +97,8 @@ def capability_line() -> str:
         "Never claim you started, finished, or will perform a side effect unless you "
         "called a writable tool that can do that side effect and it succeeded. "
         "If no listed tool can do it, decline in one short line. "
-        "Read-only tools never count as doing the work."
+        "Read-only tools never count as doing the work. Reading, reviewing, and "
+        "comparing what the read tools return is work you can do — just say what you found."
     )
 
 
@@ -99,7 +111,7 @@ def is_side_effect_promise(text: str) -> bool:
         return False
     # "можу накидати outline" / topic lists with a soft CTA — allow.
     if _SUGGEST_RE.search(t) and not re.search(
-        r"(?i)\b(?:пишу|i(?:'m| am) writing|дай хвилин|give me a)\b", t
+        r"(?i)\b(?:пишу|i(?:'m| am) writing)\b", t
     ):
         return False
     return True
@@ -111,6 +123,7 @@ def called_write_capable(funcs: Iterable[str] | None) -> bool:
 
 
 def should_decline(text: str, funcs_called: Iterable[str] | None) -> bool:
+    """`funcs_called` must span the whole user turn — see module docstring."""
     if not is_side_effect_promise(text):
         return False
     return not called_write_capable(funcs_called)
