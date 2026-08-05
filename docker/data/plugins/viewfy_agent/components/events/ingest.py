@@ -359,6 +359,12 @@ class IngestListener(EventListener):
                             provider_message.Message(role="system", content=pin_line)
                         )
 
+            # DMs have no pin to anchor on, so name the founder's products instead.
+            if not is_group and tg_id:
+                anchor = await self.plugin.product_anchor(tg_id)
+                if anchor and anchor not in _content_blob(prompts):
+                    prompts.append(provider_message.Message(role="system", content=anchor))
+
             # Re-resolve every turn: client lc (via remembered), else script of this message.
             user_text = _message_text(
                 next(
