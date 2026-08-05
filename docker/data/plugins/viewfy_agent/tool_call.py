@@ -205,7 +205,10 @@ async def agent(plugin, tool_name: str, params: dict[str, Any] | None, session) 
 
     pulse = asyncio.create_task(_pulse())
     try:
-        raw = await plugin.call_agent(tool_name, params or {}, tg_id, chat_id)
+        # The founder never has the product UUID, so the model is told to pass a
+        # name or domain. Turn that into an id before the API sees it.
+        params = await plugin.resolve_product_id(dict(params or {}), tg_id)
+        raw = await plugin.call_agent(tool_name, params, tg_id, chat_id)
         try:
             parsed = json.loads(raw) if raw else {}
         except Exception:

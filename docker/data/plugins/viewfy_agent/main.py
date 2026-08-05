@@ -51,6 +51,9 @@ def _file_settings() -> dict[str, Any]:
         return {}
 
 
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
 def _short_name(name: str | None, domain: str | None) -> str:
     """"Viewfy | He gets you users while you ship" -> "Viewfy (viewfy.ai)"."""
     label = re.split(r"[|:—–]| - ", (name or "").strip(), maxsplit=1)[0].strip()
@@ -78,7 +81,7 @@ class ViewfyAgentPlugin(BasePlugin):
         self._typing_until: dict[str, float] = {}  # chat_id -> monotonic deadline
         self._typing_tasks: dict[str, asyncio.Task] = {}
         self._turn: dict[str, dict[str, Any]] = {}  # chat_id -> side-effect gate state
-        self._anchor: dict[str, tuple[float, str]] = {}  # tg_id -> (deadline, prompt line)
+        self._anchor: dict[str, tuple[float, list[dict[str, Any]]]] = {}  # tg_id -> (deadline, products)
         self._outbox_task: asyncio.Task | None = None
         if self.bot_token and self.sticker_set:
             await self._load_stickers()
@@ -446,53 +449,93 @@ class ViewfyAgentPlugin(BasePlugin):
             query={"telegram_user_id": str(telegram_user_id)},
         )
 
-    async def product_anchor(self, telegram_user_id: str) -> str:
-        """Prompt line naming the founder's products, for DMs.
+    async def products_of(self, telegram_user_id: str) -> list[dict[str, Any]]:
+        """The founder's products, cached. Empty for unlinked users.
 
-        A group gets its anchor from the pin. A DM had none, so a fresh session
-        knew no product and asked the founder for a raw product_id. Cached: this
-        runs on every prompt, and prompts fire once per tool round.
+        Prompts fire once per tool round, so this must not hit the API each time.
+        Unlinked goes through `me` first: call_agent sends a Connect message for
+        them, which must never be a side effect of building a prompt.
         """
         tg_id = str(telegram_user_id or "").strip()
         if not tg_id:
-            return ""
+            return []
         hit = self._anchor.get(tg_id)
         if hit and hit[0] > time.monotonic():
             return hit[1]
 
-        line = ""
+        items: list[dict[str, Any]] = []
         try:
             me = await self.me(tg_id)
             if me.get("linked"):
                 raw = await self.call_agent("products", {}, tg_id)
-                items = (json.loads(raw).get("data") or {}).get("products") or []
-                named = [
-                    _short_name(p.get("name"), p.get("domain"))
-                    for p in items
-                    if isinstance(p, dict) and (p.get("name") or p.get("domain"))
-                ]
-                if len(named) == 1:
-                    line = (
-                        f"The founder has one product: {named[0]}. Use it for every product "
-                        "tool without asking which one."
-                    )
-                elif named:
-                    line = (
-                        f"The founder's products: {', '.join(named[:8])}. Ask which one by "
-                        "name or domain when it is ambiguous."
-                    )
-                if line:
-                    line += (
-                        " Never ask the founder for a product_id, post_id, action_id, or any "
-                        "other tool parameter name - those are internal. Resolve ids yourself "
-                        "by calling products; refer to products by name or domain in chat."
-                    )
+                got = (json.loads(raw).get("data") or {}).get("products") or []
+                items = [p for p in got if isinstance(p, dict) and p.get("id")]
         except Exception:
-            log.warning("product anchor fetch failed for %s", tg_id, exc_info=True)
+            log.warning("product fetch failed for %s", tg_id, exc_info=True)
 
         # Cache failures briefly too, so a flaky API cannot stall every prompt.
-        self._anchor[tg_id] = (time.monotonic() + (300 if line else 60), line)
-        return line
+        self._anchor[tg_id] = (time.monotonic() + (300 if items else 60), items)
+        return items
+
+    async def product_anchor(self, telegram_user_id: str) -> str:
+        """Prompt line naming the founder's products, for DMs.
+
+        A group gets its anchor from the pin. A DM had none, so a fresh session
+        knew no product and asked the founder for a raw product_id.
+        """
+        named = [
+            _short_name(p.get("name"), p.get("domain"))
+            for p in await self.products_of(telegram_user_id)
+            if p.get("name") or p.get("domain")
+        ]
+        if not named:
+            return ""
+        if len(named) == 1:
+            line = (
+                f"The founder has one product: {named[0]}. Use it for every product "
+                "tool without asking which one."
+            )
+        else:
+            line = (
+                f"The founder's products: {', '.join(named[:8])}. Ask which one by "
+                "name or domain when it is ambiguous."
+            )
+        return line + (
+            " Never ask the founder for a product_id, post_id, action_id, or any other "
+            "tool parameter name - those are internal. Pass the name or domain as "
+            "product_id and it resolves; refer to products by name or domain in chat."
+        )
+
+    async def resolve_product_id(
+        self, params: dict[str, Any], telegram_user_id: str
+    ) -> dict[str, Any]:
+        """Accept a name or domain where a product_id is expected, and fill in a
+        sole product when the model omitted it. The founder never has the UUID."""
+        got = str(params.get("product_id") or "").strip()
+        if _UUID_RE.match(got):
+            return params
+
+        items = await self.products_of(telegram_user_id)
+        if not items:
+            return params
+
+        if not got:
+            if len(items) == 1:
+                params["product_id"] = str(items[0]["id"])
+            return params
+
+        needle = got.lower().removeprefix("www.")
+        for p in items:
+            dom = str(p.get("domain") or "").lower().removeprefix("www.")
+            name = str(p.get("name") or "").lower()
+            if needle in (dom, name) or (dom and needle == dom.split(".")[0]):
+                params["product_id"] = str(p["id"])
+                return params
+        for p in items:  # looser: "viewfy" inside "Viewfy | He gets you users"
+            if needle and needle in str(p.get("name") or "").lower():
+                params["product_id"] = str(p["id"])
+                return params
+        return params
 
     async def call_agent(
         self,
