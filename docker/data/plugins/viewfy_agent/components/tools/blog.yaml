@@ -6,11 +6,29 @@ metadata:
     en_US: blog
     zh_Hans: blog
   description:
-    en_US: List blog posts for a product, or get one by post_id. Includes Cloudflare/DNS host status.
-    zh_Hans: List blog posts for a product, or get one by post_id. Includes Cloudflare/DNS host status.
+    en_US: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. Domains stay on the web app."
+    zh_Hans: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. Domains stay on the web app."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "post_id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: Read-only. List blog posts or get one by post_id. Cannot create or write posts. If the founder asks you to write a post, decline. Response includes host.cloudflare / dns_status - use that before claiming Cloudflare is not connected.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "post_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "get", "write", "update", "status", "set"], "default": "list"}, "confirm": {"type": "boolean", "default": false, "description": "write only: true starts generation after the founder agreed to the preview"}, "topic": {"type": "string", "description": "write: steer the post subject/title"}, "keyword": {"type": "string", "description": "write: primary keyword (defaults from topic)"}, "angle": {"type": "string", "description": "write: one-sentence claim the post makes"}, "prompt": {"type": "string", "description": "update: the change to make, in plain language"}, "status": {"type": "string", "enum": ["published", "draft"], "description": "status: target state"}, "watermark": {"type": "boolean", "description": "set"}, "lang": {"type": "string", "description": "set: language code"}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Blog CMS for the linked Viewfy user. Response includes host.cloudflare / dns_status - use
+    that before claiming Cloudflare is not connected. action=list or get reads posts.
+    action=write generates and publishes a REAL post on the founder's live blog and can queue
+    social drafts. Call it once without confirm to get a preview, show the founder what it would
+    write, and only call again with confirm=true after they agree. Pass topic= to steer the
+    subject, or omit it to take the next topic from the plan. It runs in the background: poll
+    action=list until a post with that keyword appears, which takes a few minutes. If it never
+    appears, generation failed the publish checks and nothing was published - say exactly that.
+    Never claim a post exists that list does not show, and never invent a post title or URL.
+    action=update revises an existing post_id from a plain-language prompt (e.g. "tighten the
+    intro"). Pass the founder's instruction, never a pasted article body. Poll action=get until
+    updated_at changes; if it does not, the revision failed its checks and the post is
+    unchanged. action=status with status=draft hides a post from the live blog, published
+    restores it. There is no separate "save as draft" when writing: write publishes, then
+    status=draft unpublishes if the founder wants it held back. action=set here only changes
+    watermark or lang. Changing how many posts per day, or turning the blog on or off, cannot be
+    done from Telegram - that is on the dashboard. The first post is free with no card; after
+    that writing is part of part time and the write is refused, which you should say plainly.
 execution:
   python:
     path: blog.py
