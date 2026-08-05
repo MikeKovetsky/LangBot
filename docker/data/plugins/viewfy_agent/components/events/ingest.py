@@ -20,6 +20,21 @@ import i18n  # noqa: E402
 
 log = logging.getLogger("viewfy_agent.ingest")
 
+CLOCK_PREFIX = "Clock:"
+
+
+def _clock_line(plugin, tg_id: str) -> str:
+    from datetime import timedelta
+
+    now, zone = plugin.now_for(tg_id)
+    return (
+        f"{CLOCK_PREFIX} it is {now:%H:%M} on {now:%A %Y-%m-%d} in {zone}, the founder's "
+        f"timezone. Today is {now:%Y-%m-%d}; yesterday was {now - timedelta(days=1):%Y-%m-%d}. "
+        "Never work the date out from tool output - traffic stats end at the last complete "
+        "day, so their newest bucket is yesterday. Say dates the way the founder would."
+    )
+
+
 FORMAT_LINE = (
     "Format replies in Markdown for Telegram: use **bold** and fenced code blocks for "
     "draft or post bodies. Do NOT paste CTA https links or markdown [label](url) for "
@@ -328,6 +343,15 @@ class IngestListener(EventListener):
             import side_effect
 
             prompts = list(event.default_prompt or [])
+            # Replaced, not appended: a turn rebuilds this prompt once per tool
+            # round and stale clocks would pile up inside one conversation.
+            prompts = [
+                m for m in prompts
+                if not str(getattr(m, "content", "") or "").startswith(CLOCK_PREFIX)
+            ]
+            prompts.append(
+                provider_message.Message(role="system", content=_clock_line(self.plugin, tg_id))
+            )
             if FORMAT_LINE not in _content_blob(prompts):
                 prompts.append(provider_message.Message(role="system", content=FORMAT_LINE))
             caps = side_effect.capability_line()

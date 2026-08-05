@@ -3,13 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import pathlib
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langbot_plugin.api.definition.plugin import BasePlugin
 
@@ -73,8 +76,11 @@ class ViewfyAgentPlugin(BasePlugin):
         self.stickers: dict[str, str] = {}  # emoji -> file_id
         self.sticker_order: list[str] = []
         self.user_lang: dict[str, str] = {}  # telegram_user_id -> en|ua|ru
+        self.user_tz: dict[str, str] = {}  # telegram_user_id -> IANA zone
         self._lang_path = pathlib.Path(__file__).resolve().parent / "data" / "user_lang.json"
         self._load_user_lang()
+        self._tz_path = pathlib.Path(__file__).resolve().parent / "data" / "user_tz.json"
+        self._load_user_tz()
         self._typing_until: dict[str, float] = {}  # chat_id -> monotonic deadline
         self._typing_tasks: dict[str, asyncio.Task] = {}
         self._turn: dict[str, dict[str, Any]] = {}  # chat_id -> side-effect gate state
@@ -136,6 +142,48 @@ class ViewfyAgentPlugin(BasePlugin):
             self.user_lang[key] = resolved
             self._save_user_lang()
         return resolved
+
+    def _load_user_tz(self) -> None:
+        try:
+            if self._tz_path.is_file():
+                raw = json.loads(self._tz_path.read_text())
+                if isinstance(raw, dict):
+                    self.user_tz = {str(k): str(v) for k, v in raw.items() if v}
+        except Exception:
+            log.exception("load user_tz failed")
+
+    def _save_user_tz(self) -> None:
+        try:
+            self._tz_path.parent.mkdir(parents=True, exist_ok=True)
+            self._tz_path.write_text(json.dumps(self.user_tz, ensure_ascii=False, indent=0))
+        except Exception:
+            log.exception("save user_tz failed")
+
+    def tz_for(self, telegram_user_id: str) -> str:
+        """The founder's zone. Telegram never tells us, so it is set or defaulted."""
+        return (
+            self.user_tz.get(str(telegram_user_id))
+            or os.getenv("VIEWFY_DEFAULT_TZ")
+            or "UTC"
+        )
+
+    def remember_tz(self, telegram_user_id: str, tz: str) -> bool:
+        name = (tz or "").strip()
+        try:
+            ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError, KeyError):
+            return False
+        self.user_tz[str(telegram_user_id)] = name
+        self._save_user_tz()
+        return True
+
+    def now_for(self, telegram_user_id: str) -> tuple[datetime, str]:
+        """(local now, zone name). Falls back to UTC rather than guessing."""
+        name = self.tz_for(telegram_user_id)
+        try:
+            return datetime.now(ZoneInfo(name)), name
+        except Exception:
+            return datetime.now(timezone.utc), "UTC"
 
     def lang_for(self, telegram_user_id: str) -> str:
         return self.user_lang.get(str(telegram_user_id), "en")
