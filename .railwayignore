@@ -1,0 +1,27 @@
+# What `railway up` uploads as build context.
+#
+# docker/data is a live install: the sqlite database carries the bot token and
+# model provider keys, dogfood/ holds raw tokens, and the plugin's settings.json
+# holds the Telegram token and the agent secret. None of it belongs in a build
+# context. The Dockerfile needs only src/ (three patched files), the plugin code,
+# and docker/railway.
+.git
+.venv
+web/node_modules
+web/.next
+**/__pycache__
+
+docker/data/langbot.db
+docker/data/config.yaml
+docker/data/dogfood
+docker/data/logs
+docker/data/chroma
+docker/data/metadata
+docker/data/labels
+docker/data/temp
+docker/data/storage
+docker/data/box
+
+# Secrets, and per-install state the volume owns.
+docker/data/plugins/viewfy_agent/settings.json
+docker/data/plugins/viewfy_agent/data

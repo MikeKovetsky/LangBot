@@ -11,10 +11,13 @@ PLUGIN_DIR=/app/data/plugins/viewfy_agent
 
 mkdir -p "$PLUGIN_DIR"
 
-# Code comes from the image; the plugin's own state does not. Copying file by
-# file leaves data/ and settings.json alone, so a deploy never drops a founder's
-# language preference.
-cp -R /app/plugin-src/viewfy_agent/. "$PLUGIN_DIR"/
+# Code comes from the image; the plugin's own state does not. data/ holds
+# user_lang.json, which a founder built up one message at a time, and settings.json
+# is written below from env - a blanket copy would clobber both on every deploy.
+find /app/plugin-src/viewfy_agent -mindepth 1 -maxdepth 1 \
+  ! -name data ! -name settings.json \
+  -exec cp -R {} "$PLUGIN_DIR"/ \;
+mkdir -p "$PLUGIN_DIR/data"
 
 # Secrets live in Railway's environment, never in the image or the repo.
 if [ -n "$VIEWFY_TELEGRAM_AGENT_SECRET" ]; then

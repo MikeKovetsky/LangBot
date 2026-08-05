@@ -6,3 +6,19 @@
 web/.next
 web/node_modules
 web/.env
+
+# A live install, not build input: the sqlite db carries the bot token and model
+# provider keys, dogfood/ holds raw tokens, and the plugin's settings.json holds
+# the Telegram token. COPY of the plugin directory would otherwise bake it in.
+docker/data/langbot.db
+docker/data/config.yaml
+docker/data/dogfood
+docker/data/logs
+docker/data/chroma
+docker/data/metadata
+docker/data/labels
+docker/data/temp
+docker/data/storage
+docker/data/box
+docker/data/plugins/viewfy_agent/settings.json
+docker/data/plugins/viewfy_agent/data

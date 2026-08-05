@@ -1,0 +1,13 @@
+# Railway builds the bot from docker/railway/Dockerfile, not the upstream
+# Dockerfile at the repo root: that one builds LangBot from source, while this
+# fork only needs the published image plus three patched files and the plugin.
+[build]
+builder = "dockerfile"
+dockerfilePath = "docker/railway/Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+# One replica, always. Telegram allows a single getUpdates consumer per token,
+# so a second replica would fight the first and both would drop messages.
+numReplicas = 1
