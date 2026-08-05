@@ -51,9 +51,6 @@ def _file_settings() -> dict[str, Any]:
         return {}
 
 
-_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
-
-
 def _short_name(name: str | None, domain: str | None) -> str:
     """"Viewfy | He gets you users while you ship" -> "Viewfy (viewfy.ai)"."""
     label = re.split(r"[|:—–]| - ", (name or "").strip(), maxsplit=1)[0].strip()
@@ -505,37 +502,6 @@ class ViewfyAgentPlugin(BasePlugin):
             "tool parameter name - those are internal. Pass the name or domain as "
             "product_id and it resolves; refer to products by name or domain in chat."
         )
-
-    async def resolve_product_id(
-        self, params: dict[str, Any], telegram_user_id: str
-    ) -> dict[str, Any]:
-        """Accept a name or domain where a product_id is expected, and fill in a
-        sole product when the model omitted it. The founder never has the UUID."""
-        got = str(params.get("product_id") or "").strip()
-        if _UUID_RE.match(got):
-            return params
-
-        items = await self.products_of(telegram_user_id)
-        if not items:
-            return params
-
-        if not got:
-            if len(items) == 1:
-                params["product_id"] = str(items[0]["id"])
-            return params
-
-        needle = got.lower().removeprefix("www.")
-        for p in items:
-            dom = str(p.get("domain") or "").lower().removeprefix("www.")
-            name = str(p.get("name") or "").lower()
-            if needle in (dom, name) or (dom and needle == dom.split(".")[0]):
-                params["product_id"] = str(p["id"])
-                return params
-        for p in items:  # looser: "viewfy" inside "Viewfy | He gets you users"
-            if needle and needle in str(p.get("name") or "").lower():
-                params["product_id"] = str(p["id"])
-                return params
-        return params
 
     async def call_agent(
         self,

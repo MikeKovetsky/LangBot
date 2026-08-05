@@ -17,42 +17,15 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-# Can perform a side effect (even if some actions on the tool are read-only).
-WRITE_CAPABLE: frozenset[str] = frozenset(
-    {
-        "scrape",
-        "audit",
-        "form_pr",
-        "variants",
-        "strategy",
-        "links",
-        "connect",
-        "inbox",
-        "roam",
-        "roam_session",
-        "roam_approve",
-        "group_pin",
-        "product_invite",
-        "product_members",
-        # blog.yaml exposes action=write/update/status, so "publishing it now" can
-        # be true. Move it back to READ_ONLY if that tool goes back to list/get.
-        "blog",
-    }
-)
-
-# Never mutate product state. Calling these does not authorize "I'm doing it".
-READ_ONLY: frozenset[str] = frozenset(
-    {
-        "products",
-        "issues",
-        "campaigns",
-        "insights",
-        "stats",
-        "inbox_credentials",
-        "approvals",
-        "roam_queue",
-    }
-)
+try:
+    # Generated from the agent registry's scopes, so a tool that grows write
+    # actions cannot leave this gate refusing work it can now really do.
+    from capabilities import READ_ONLY, WRITE_CAPABLE
+except ImportError:  # generator never ran
+    # Fail open. An unknown capability must not turn a truthful "published it"
+    # into a refusal in the founder's chat; the worst case is the old behaviour.
+    READ_ONLY: frozenset[str] = frozenset()
+    WRITE_CAPABLE = None
 
 # Claims of performing a mutation now. Reading, reviewing, and picking are not
 # mutations, and "секунду / one sec" on its own claims nothing.
@@ -88,6 +61,8 @@ _SUGGEST_RE = re.compile(
 
 
 def capability_line() -> str:
+    if not WRITE_CAPABLE:
+        return ""
     writable = ", ".join(sorted(WRITE_CAPABLE))
     readonly = ", ".join(sorted(READ_ONLY))
     return (
@@ -118,6 +93,8 @@ def is_side_effect_promise(text: str) -> bool:
 
 
 def called_write_capable(funcs: Iterable[str] | None) -> bool:
+    if WRITE_CAPABLE is None:
+        return True  # capabilities unknown — never call a claim a lie on a guess
     names = {str(f).strip() for f in (funcs or []) if str(f).strip()}
     return bool(names & WRITE_CAPABLE)
 
