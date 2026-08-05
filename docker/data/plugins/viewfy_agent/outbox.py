@@ -30,6 +30,8 @@ Rules:
 - If kind is product_invite_accepted / outcome accepted: say they are in on the product, briefly.
 - If kind is pr_ready / outcome open: say the SEO fix PR is live on GitHub. Do not paste the URL
   (a button is attached). Mention repo or PR number lightly if useful.
+- If kind is blog_published / outcome published: the post the founder asked for is live on
+  their blog. Name the title, one line. Do not paste the URL (a button is attached).
 - If kind is daily_digest / outcome morning: this is the morning report. Open like
   "morning. here is {day}, while you were shipping." then short lines for each non-empty
   section (visitors, signups, citations, post, ads total, link building, sales, roam).
