@@ -6,11 +6,13 @@ metadata:
     en_US: group_pin
     zh_Hans: group_pin
   description:
-    en_US: Pin this Telegram group to one Viewfy product (server-enforced).
-    zh_Hans: Pin this Telegram group to one Viewfy product (server-enforced).
+    en_US: "Pin this Telegram group to one product so all tools stay on that product (server-enforced; not prompt-only). action=get|set|clear. set requires product_id. Only call from a group chat. Caller must own the product."
+    zh_Hans: "Pin this Telegram group to one product so all tools stay on that product (server-enforced; not prompt-only). action=get|set|clear. set requires product_id. Only call from a group chat. Caller must own the product."
 spec:
-  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set", "clear"], "default": "get"}, "product_id": {"type": "string"}}, "required": []}
-  llm_prompt: Pin this Telegram group to one product so tools cannot touch other products. Use set with product_id from a group chat. Never show product ids in chat copy.
+  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set", "clear"], "default": "get"}, "product_id": {"type": "string", "description": "Required for set."}}, "required": [], "additionalProperties": false}
+  llm_prompt: >-
+    Pin this Telegram group to one product so tools cannot touch other products. Use set with
+    product_id from a group chat. Never show product ids in chat copy.
 execution:
   python:
     path: group_pin.py

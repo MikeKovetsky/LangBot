@@ -6,42 +6,17 @@ metadata:
     en_US: inbox
     zh_Hans: inbox
   description:
-    en_US: Viewfy agent inbox / email (інбокс, пошта) — get/create/messages, attach hi@inbox.<domain> via Cloudflare, or send. Use when asked if we have an inbox.
-    zh_Hans: Viewfy agent inbox / email — get/create/messages, attach hi@inbox.<domain> via Cloudflare, or send.
+    en_US: "Agent email inbox. action=get (default) returns address, custom-domain status, and recent messages (no password). action=create claims the Viewfy host inbox. action=messages lists more mail. action=attach starts Cloudflare OAuth to put hi@inbox.<domain> on the customer zone (read+write; apex untouched). action=send requires a ready custom domain: to, subject, text (optional html). For signup passwords use inbox_credentials on /api/agent only \u2014 never exposed on MCP."
+    zh_Hans: "Agent email inbox. action=get (default) returns address, custom-domain status, and recent messages (no password). action=create claims the Viewfy host inbox. action=messages lists more mail. action=attach starts Cloudflare OAuth to put hi@inbox.<domain> on the customer zone (read+write; apex untouched). action=send requires a ready custom domain: to, subject, text (optional html). For signup passwords use inbox_credentials on /api/agent only \u2014 never exposed on MCP."
 spec:
-  parameters:
-    {
-      "type": "object",
-      "properties":
-        {
-          "product_id": { "type": "string" },
-          "action":
-            {
-              "type": "string",
-              "enum": ["get", "create", "messages", "send", "attach"],
-              "default": "get",
-              "description": "get status+mail; create Viewfy host; messages; send; attach custom domain",
-            },
-          "domain":
-            {
-              "type": "string",
-              "description": "Apex for attach (defaults to product.domain)",
-            },
-          "to": { "type": "string", "description": "Recipient for send" },
-          "subject": { "type": "string" },
-          "text": { "type": "string" },
-          "html": { "type": "string" },
-          "limit": { "type": "integer" },
-        },
-      "required": ["product_id"],
-    }
-  llm_prompt: >
-    Viewfy agent inbox (also called інбокс / agent email / hi@inbox.<domain>).
-    For "do we have an inbox" or similar, call action=get — never say this tool is missing.
-    action=get includes cloudflare/domain DNS status; read that before claiming Cloudflare is not connected.
-    For custom domain hi@inbox.<domain>, call action=attach (Telegram Connect Cloudflare button;
-    do not paste the URL). action=attach is for email DNS, not site analytics.
-    action=send only after domain sending is ready. Never ask for the inbox password.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "create", "messages", "send", "attach"], "default": "get"}, "domain": {"type": "string", "description": "Apex for attach (defaults to product.domain)."}, "to": {"type": "string", "description": "Recipient for send."}, "subject": {"type": "string"}, "text": {"type": "string"}, "html": {"type": "string"}, "limit": {"type": "integer", "description": "Message page size for get/messages."}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Viewfy agent inbox (also called інбокс / agent email / hi@inbox.<domain>). For "do we have
+    an inbox" or similar, call action=get — never say this tool is missing. action=get includes
+    cloudflare/domain DNS status; read that before claiming Cloudflare is not connected. For
+    custom domain hi@inbox.<domain>, call action=attach (Telegram Connect Cloudflare button; do
+    not paste the URL). action=attach is for email DNS, not site analytics. action=send only
+    after domain sending is ready. Never ask for the inbox password.
 execution:
   python:
     path: inbox.py

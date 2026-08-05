@@ -6,11 +6,13 @@ metadata:
     en_US: products
     zh_Hans: products
   description:
-    en_US: List the user's Viewfy products, or get one by id (includes blog/inbox Cloudflare status).
-    zh_Hans: List the user's Viewfy products, or get one by id (includes blog/inbox Cloudflare status).
+    en_US: "List the user's products, or get one by id. Prefer this before other product tools."
+    zh_Hans: "List the user's products, or get one by id. Prefer this before other product tools."
 spec:
-  parameters: {"type": "object", "properties": {"id": {"type": "string", "description": "Product UUID. Omit to list."}}}
-  llm_prompt: List the user's Viewfy products, or get one by id. Getting by id includes cloudflare.blog / cloudflare.inbox — read those before claiming Cloudflare is not connected.
+  parameters: {"type": "object", "properties": {"id": {"type": "string", "description": "Product UUID. Omit to list."}}, "required": [], "additionalProperties": false}
+  llm_prompt: >-
+    List the user's Viewfy products, or get one by id. Getting by id includes cloudflare.blog /
+    cloudflare.inbox — read those before claiming Cloudflare is not connected.
 execution:
   python:
     path: products.py

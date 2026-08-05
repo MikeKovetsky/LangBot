@@ -6,11 +6,13 @@ metadata:
     en_US: product_invite
     zh_Hans: product_invite
   description:
-    en_US: Mint a temp product invite link (signup then join + bind Telegram).
-    zh_Hans: Mint a temp product invite link (signup then join + bind Telegram).
+    en_US: "Mint a temp product invite link (signup/signin \u2192 join product + bind Telegram). action=create|list. Returns facts + url; Telegram attaches a Join button \u2014 do not paste the url. never invent a different link. Optional telegram_user_id for the invitee."
+    zh_Hans: "Mint a temp product invite link (signup/signin \u2192 join product + bind Telegram). action=create|list. Returns facts + url; Telegram attaches a Join button \u2014 do not paste the url. never invent a different link. Optional telegram_user_id for the invitee."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["create", "list"], "default": "create"}, "telegram_user_id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: Mint a product invite URL for a customer. Include the returned url verbatim once in chat. Never invent a different link. Never show UUIDs.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["create", "list"], "default": "create"}, "telegram_user_id": {"type": "string", "description": "Optional Telegram user id to bind on accept."}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Mint a product invite URL for a customer. Include the returned url verbatim once in chat.
+    Never invent a different link. Never show UUIDs.
 execution:
   python:
     path: product_invite.py

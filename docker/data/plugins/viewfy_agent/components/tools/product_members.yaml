@@ -6,11 +6,13 @@ metadata:
     en_US: product_members
     zh_Hans: product_members
   description:
-    en_US: List collaborators; add mints invite URL or adds existing email; remove by email.
-    zh_Hans: List collaborators; add mints invite URL or adds existing email; remove by email.
+    en_US: "List or change collaborators on a product. action=list|add|remove. add without a known email mints an invite URL (facts); if email already exists, adds user_products. remove still needs email. Only the author can mutate."
+    zh_Hans: "List or change collaborators on a product. action=list|add|remove. add without a known email mints an invite URL (facts); if email already exists, adds user_products. remove still needs email. Only the author can mutate."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "add", "remove"], "default": "list"}, "email": {"type": "string"}, "telegram_user_id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: Manage product collaborators. Prefer product_invite / add without email to mint a signup link; include the url verbatim. remove needs email. Never show raw ids in chat.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "add", "remove"], "default": "list"}, "email": {"type": "string", "description": "Optional for add (existing user); required for remove."}, "telegram_user_id": {"type": "string", "description": "Optional invitee Telegram id when minting."}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Manage product collaborators. Prefer product_invite / add without email to mint a signup
+    link; include the url verbatim. remove needs email. Never show raw ids in chat.
 execution:
   python:
     path: product_members.py

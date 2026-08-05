@@ -6,11 +6,12 @@ metadata:
     en_US: variants
     zh_Hans: variants
   description:
-    en_US: List campaign variants or start generation.
-    zh_Hans: List campaign variants or start generation.
+    en_US: "List campaign variants or action=start to generate more. Poll list until statuses settle."
+    zh_Hans: "List campaign variants or action=start to generate more. Poll list until statuses settle."
 spec:
-  parameters: {"type": "object", "properties": {"campaign_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "start"], "default": "list"}, "prompt": {"type": "string"}, "count": {"type": "integer"}, "creative_type": {"type": "string"}}, "required": ["campaign_id"]}
-  llm_prompt: List campaign variants or start generation. Use only for the linked Viewfy user.
+  parameters: {"type": "object", "properties": {"campaign_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "start"], "default": "list"}, "prompt": {"type": "string"}, "count": {"type": "integer"}, "creative_type": {"type": "string", "enum": ["video", "image"], "default": "video"}}, "required": ["campaign_id"], "additionalProperties": false}
+  llm_prompt: >-
+    List campaign variants or start generation. Use only for the linked Viewfy user.
 execution:
   python:
     path: variants.py

@@ -6,11 +6,13 @@ metadata:
     en_US: roam_queue
     zh_Hans: roam_queue
   description:
-    en_US: List pending roam drafts waiting for approval.
-    zh_Hans: List pending roam drafts waiting for approval.
+    en_US: "List roam actions for the founder's products. Default status=draft (waiting for approval). Use this when they say approve/reject so you can pick the matching draft and pass its id to roam_approve. Returns action ids for tools only; never show ids in chat. Prefer matching by channel, target title/url, and draft text from the recent conversation."
+    zh_Hans: "List roam actions for the founder's products. Default status=draft (waiting for approval). Use this when they say approve/reject so you can pick the matching draft and pass its id to roam_approve. Returns action ids for tools only; never show ids in chat. Prefer matching by channel, target title/url, and draft text from the recent conversation."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "status": {"type": "string", "default": "draft"}, "channel": {"type": "string"}, "limit": {"type": "integer"}}, "required": []}
-  llm_prompt: List pending roam drafts. Use when the founder says approve/reject so you can find the matching draft id for roam_approve. Never show action ids in chat.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string", "description": "Optional. Omit to list across all owned products."}, "status": {"type": "string", "description": "Comma-separated statuses (default draft).", "default": "draft"}, "channel": {"type": "string", "description": "Optional channel key filter."}, "limit": {"type": "integer", "description": "Max rows (default 10, max 50)."}}, "required": [], "additionalProperties": false}
+  llm_prompt: >-
+    List pending roam drafts. Use when the founder says approve/reject so you can find the
+    matching draft id for roam_approve. Never show action ids in chat.
 execution:
   python:
     path: roam_queue.py

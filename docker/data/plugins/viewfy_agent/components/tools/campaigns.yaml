@@ -6,11 +6,12 @@ metadata:
     en_US: campaigns
     zh_Hans: campaigns
   description:
-    en_US: List campaigns or get one by id.
-    zh_Hans: List campaigns or get one by id.
+    en_US: "List campaigns or get one by id (includes light insights). Read-only."
+    zh_Hans: "List campaigns or get one by id (includes light insights). Read-only."
 spec:
-  parameters: {"type": "object", "properties": {"id": {"type": "string"}, "product_id": {"type": "string"}}}
-  llm_prompt: List campaigns or get one by id. Use only for the linked Viewfy user.
+  parameters: {"type": "object", "properties": {"id": {"type": "string"}, "product_id": {"type": "string", "description": "Filter list by product"}}, "required": [], "additionalProperties": false}
+  llm_prompt: >-
+    List campaigns or get one by id. Use only for the linked Viewfy user.
 execution:
   python:
     path: campaigns.py

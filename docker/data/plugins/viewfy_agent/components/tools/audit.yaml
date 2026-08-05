@@ -6,11 +6,12 @@ metadata:
     en_US: audit
     zh_Hans: audit
   description:
-    en_US: SEO/GEO audit. action=start or get. Poll until done.
-    zh_Hans: SEO/GEO audit. action=start or get. Poll until done.
+    en_US: "SEO/GEO audit. action=start enqueues; action=get returns status/score. Poll until status=done."
+    zh_Hans: "SEO/GEO audit. action=start enqueues; action=get returns status/score. Poll until status=done."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["start", "get"], "default": "get"}, "audit_id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: SEO/GEO audit. action=start or get. Poll until done. Use only for the linked Viewfy user.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["start", "get"], "default": "get"}, "audit_id": {"type": "string", "description": "Optional specific audit id"}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    SEO/GEO audit. action=start or get. Poll until done. Use only for the linked Viewfy user.
 execution:
   python:
     path: audit.py

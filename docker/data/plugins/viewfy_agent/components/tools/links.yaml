@@ -6,69 +6,25 @@ metadata:
     en_US: links
     zh_Hans: links
   description:
-    en_US: Link-building CMS — list found sites, show drafted/sent outreach emails, approve or reject drafts, stats.
-    zh_Hans: Link-building CMS — list found sites, show drafted/sent outreach emails, approve or reject drafts, stats.
+    en_US: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=outreach: emails drafted/sent (includes full body; pass domain= for one site). action=queue: drafts awaiting approve. action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
+    zh_Hans: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=outreach: emails drafted/sent (includes full body; pass domain= for one site). action=queue: drafts awaiting approve. action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
 spec:
-  parameters:
-    {
-      "type": "object",
-      "properties":
-        {
-          "action":
-            {
-              "type": "string",
-              "enum": ["found", "outreach", "queue", "stats", "approve", "reject", "find"],
-              "default": "found",
-              "description": "found | outreach | queue | stats | approve | reject | find",
-            },
-          "motion":
-            {
-              "type": "string",
-              "enum": ["link", "sales"],
-              "default": "link",
-              "description": "What the outreach is for. link = guest posts / backlinks. sales = cold outreach to companies whose site we checked. Separate queues. Internal field name - never show the word to the founder; ask which goal they mean in their own words.",
-            },
-          "product_id": { "type": "string", "description": "Required for CMS actions" },
-          "outreach_id":
-            {
-              "type": "string",
-              "description": "Required for approve/reject (from queue/outreach)",
-            },
-          "status": { "type": "string" },
-          "kind":
-            {
-              "type": "string",
-              "enum": ["pitch", "followup", "reply"],
-            },
-          "type":
-            {
-              "type": "string",
-              "enum": ["guest_post", "resource", "directory", "roundup", "podcast"],
-            },
-          "domain": { "type": "string" },
-          "niche": { "type": "string", "description": "Required for find" },
-          "limit": { "type": "integer", "default": 50 },
-        },
-      "required": [],
-    }
-  llm_prompt: >
-    Outreach CMS. motion=link is backlinks / guest posts; motion=sales is cold
-    outreach to companies whose site we checked and found a problem on. They are
-    separate queues: a call without motion= returns link only, so pass motion=sales
-    when the founder asks about sales drafts, and use the approvals tool when they
-    ask for everything. Never print the word "motion" (or a transliteration of it) to
-    the founder - name the goal instead, in their language, one language per message.
-    action=found: list sites the bot discovered.
-    action=stats: how many sent, how many got a reply, reply rate — prefer this for
-    status / "what's next" / task overviews (no email bodies).
-    action=queue: drafts waiting for approve (metadata only).
-    action=outreach: list drafted or sent emails. Without domain=, subjects/metadata
-    only. With domain=, PRINT that one full subject + body.
-    action=approve / reject: needs outreach_id from queue (then send or discard).
-    If data.truncated or error=payload_too_large: use the catalog silently for counts/
-    status. Only ask which domain to open if the founder explicitly wants to read a
-    draft. Never invent bodies/domains or claim an email was sent unless outreach/stats
-    says so.
+  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["found", "outreach", "queue", "stats", "approve", "reject", "find"], "description": "CMS default found. approve/reject need write scope.", "default": "found"}, "product_id": {"type": "string", "description": "Required for CMS actions. Optional for find."}, "purpose": {"type": "string", "enum": ["link", "sales"], "description": "Which outreach the action applies to. Default link.", "default": "link"}, "outreach_id": {"type": "string", "description": "Required for approve/reject. Id from queue/outreach."}, "status": {"type": "string", "description": "Filter found/outreach by status (comma-separated)."}, "kind": {"type": "string", "enum": ["pitch", "followup", "reply"], "description": "outreach filter."}, "type": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}, "domain": {"type": "string"}, "niche": {"type": "string", "description": "Required for find."}, "types": {"type": "array", "items": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}}, "limit": {"type": "integer", "default": 50}, "contacts": {"type": "boolean", "default": true}, "exclude": {"type": "array", "items": {"type": "string"}}}, "required": [], "additionalProperties": false}
+  llm_prompt: >-
+    Outreach CMS. purpose=link is backlinks / guest posts; purpose=sales is cold outreach to
+    companies whose site we checked and found a problem on. They are separate queues: a call
+    without purpose= returns link only, so pass purpose=sales when the founder asks about sales
+    drafts, and use the approvals tool when they ask for everything. Never print the words
+    "motion" or "purpose" (or a transliteration) to the founder - name the goal instead, in
+    their language, one language per message. action=found: list sites the bot discovered.
+    action=stats: how many sent, how many got a reply, reply rate — prefer this for status /
+    "what's next" / task overviews (no email bodies). action=queue: drafts waiting for approve
+    (metadata only). action=outreach: list drafted or sent emails. Without domain=,
+    subjects/metadata only. With domain=, PRINT that one full subject + body. action=approve /
+    reject: needs outreach_id from queue (then send or discard). If data.truncated or
+    error=payload_too_large: use the catalog silently for counts/ status. Only ask which domain
+    to open if the founder explicitly wants to read a draft. Never invent bodies/domains or
+    claim an email was sent unless outreach/stats says so.
 execution:
   python:
     path: links.py

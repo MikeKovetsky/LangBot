@@ -6,29 +6,19 @@ metadata:
     en_US: approvals
     zh_Hans: approvals
   description:
-    en_US: Everything awaiting the founder's approval, across link building, sales and roam.
-    zh_Hans: Everything awaiting the founder's approval, across link building, sales and roam.
+    en_US: "Everything awaiting the founder's approval across every motion - link building pitches, sales emails and roam comments. Use this whenever they ask to see all drafts, or what is pending. `links` and `roam_queue` each show only their own slice, so answering 'all drafts' from either one hides the rest. Approve each item with the tool named in approve_with. Group and label items by what they are for, in the founder's language; never print the field name."
+    zh_Hans: "Everything awaiting the founder's approval across every motion - link building pitches, sales emails and roam comments. Use this whenever they ask to see all drafts, or what is pending. `links` and `roam_queue` each show only their own slice, so answering 'all drafts' from either one hides the rest. Approve each item with the tool named in approve_with. Group and label items by what they are for, in the founder's language; never print the field name."
 spec:
-  parameters:
-    {
-      "type": "object",
-      "properties":
-        {
-          "product_id": { "type": "string", "description": "Required." },
-          "limit": { "type": "integer", "default": 50 },
-        },
-      "required": ["product_id"],
-    }
-  llm_prompt: >
-    Everything waiting on the founder, across every motion — link-building pitches,
-    sales emails and roam comments. Use this whenever they ask to see all drafts, or
-    what is pending, or "show me the drafts". `links` and `roam_queue` each return
-    only their own slice, so answering "all drafts" from either one looks complete
-    while hiding the rest. Each item carries approve_with, naming the tool that
-    approves it. Print the body when the founder wants to read one. Report exactly
-    what the call returns and nothing else. Group them by what they are for - link
-    building, sales, roam comments - in the founder's language, one language per
-    message. "motion" is an internal field name and must never appear in a reply.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string", "description": "Product id."}, "limit": {"type": "integer", "description": "Max per motion (default 50)."}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Everything waiting on the founder, across every motion — link-building pitches, sales emails
+    and roam comments. Use this whenever they ask to see all drafts, or what is pending, or
+    "show me the drafts". `links` and `roam_queue` each return only their own slice, so
+    answering "all drafts" from either one looks complete while hiding the rest. Each item
+    carries approve_with, naming the tool that approves it. Print the body when the founder
+    wants to read one. Report exactly what the call returns and nothing else. Group them by what
+    they are for - link building, sales, roam comments - in the founder's language, one language
+    per message. "motion" is an internal field name and must never appear in a reply.
 execution:
   python:
     path: approvals.py

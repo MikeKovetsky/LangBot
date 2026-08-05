@@ -6,11 +6,14 @@ metadata:
     en_US: stats
     zh_Hans: stats
   description:
-    en_US: Viewfy tracker traffic (users/day, pageviews). Same as the dashboard Traffic panel. Prefer this over GA/Plausible/Cloudflare Analytics.
-    zh_Hans: Viewfy tracker traffic (users/day, pageviews). Same as the dashboard Traffic panel. Prefer this over GA/Plausible/Cloudflare Analytics.
+    en_US: "Viewfy tracker traffic for a product (same as the dashboard Traffic panel): unique users/day, pageviews, custom events. Use for questions like users per day or site traffic. Does not need GA/Plausible/Cloudflare. Default last 14 complete days."
+    zh_Hans: "Viewfy tracker traffic for a product (same as the dashboard Traffic panel): unique users/day, pageviews, custom events. Use for questions like users per day or site traffic. Does not need GA/Plausible/Cloudflare. Default last 14 complete days."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "days": {"type": "integer", "description": "Completed-day window (default 14, max 90).", "default": 14}}, "required": ["product_id"]}
-  llm_prompt: Viewfy tracker site traffic for a product (unique users, pageviews, daily series). Use for users-per-day / traffic questions. Do not ask for GA, Plausible, or Cloudflare Analytics. Cloudflare connect is only for blog DNS/worker and inbox email, not traffic stats.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "days": {"type": "integer", "description": "Completed-day window (default 14, max 90).", "default": 14}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Viewfy tracker site traffic for a product (unique users, pageviews, daily series). Use for
+    users-per-day / traffic questions. Do not ask for GA, Plausible, or Cloudflare Analytics.
+    Cloudflare connect is only for blog DNS/worker and inbox email, not traffic stats.
 execution:
   python:
     path: stats.py

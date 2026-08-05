@@ -6,11 +6,13 @@ metadata:
     en_US: form_pr
     zh_Hans: form_pr
   description:
-    en_US: Preview, enqueue, or poll an SEO fix PR. Never invent PR URLs.
-    zh_Hans: Preview, enqueue, or poll an SEO fix PR. Never invent PR URLs.
+    en_US: "SEO fix PR. action=create (default): preview without confirm, enqueue with confirm=true. action=get: poll latest (or id) until state=open and url is set. Never invent a PR URL; when url appears Telegram gets an Open PR button."
+    zh_Hans: "SEO fix PR. action=create (default): preview without confirm, enqueue with confirm=true. action=get: poll latest (or id) until state=open and url is set. Never invent a PR URL; when url appears Telegram gets an Open PR button."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["create", "get"], "default": "create"}, "confirm": {"type": "boolean", "default": false}, "repo_id": {"type": "string"}, "audit_id": {"type": "string"}, "id": {"type": "string"}}, "required": ["product_id"]}
-  llm_prompt: Preview or enqueue an SEO fix PR (confirm=true to queue). action=get polls until url is set. Never invent a PR URL; Telegram gets an Open PR button when ready.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["create", "get"], "default": "create"}, "confirm": {"type": "boolean", "default": false}, "repo_id": {"type": "string"}, "audit_id": {"type": "string"}, "id": {"type": "string", "description": "PR id for action=get"}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Preview or enqueue an SEO fix PR (confirm=true to queue). action=get polls until url is set.
+    Never invent a PR URL; Telegram gets an Open PR button when ready.
 execution:
   python:
     path: form_pr.py

@@ -6,11 +6,13 @@ metadata:
     en_US: scrape
     zh_Hans: scrape
   description:
-    en_US: Scrape a product URL the founder typed and optionally create a Viewfy product. Never invent URLs.
-    zh_Hans: Scrape a product URL the founder typed and optionally create a Viewfy product. Never invent URLs.
+    en_US: "Scrape a product URL and create a Viewfy product (slow, sync). Only use a URL the founder typed in this chat \u2014 never invent or guess one. Echo the exact URL and get confirmation before create=true. Set create=false to preview only."
+    zh_Hans: "Scrape a product URL and create a Viewfy product (slow, sync). Only use a URL the founder typed in this chat \u2014 never invent or guess one. Echo the exact URL and get confirmation before create=true. Set create=false to preview only."
 spec:
-  parameters: {"type": "object", "properties": {"url": {"type": "string", "description": "Exact URL from the founder"}, "create": {"type": "boolean", "default": true}}, "required": ["url"]}
-  llm_prompt: Scrape only a product URL the founder typed in this chat. Never invent or guess a URL. Echo the exact URL and get a clear yes before create=true. Bare hey/@ pings are not consent.
+  parameters: {"type": "object", "properties": {"url": {"type": "string", "description": "Exact product website or App Store URL from the founder (never invent)"}, "create": {"type": "boolean", "description": "Save as product (default true). Confirm URL with founder first.", "default": true}}, "required": ["url"], "additionalProperties": false}
+  llm_prompt: >-
+    Scrape only a product URL the founder typed in this chat. Never invent or guess a URL. Echo
+    the exact URL and get a clear yes before create=true. Bare hey/@ pings are not consent.
 execution:
   python:
     path: scrape.py

@@ -6,11 +6,12 @@ metadata:
     en_US: roam
     zh_Hans: roam
   description:
-    en_US: Get or set per-channel roam outreach settings.
-    zh_Hans: Get or set per-channel roam outreach settings.
+    en_US: "Per-channel outreach settings. action=get lists channels with prompt and post_access (full_access | approve_required). action=set edits one channel: `post_access=full_access` queues drafts without human approve; `approve_required` waits for approve. Prefer post_access; `auto` bool is a legacy synonym (true=full_access). Turning full_access on for a community platform is allowed but risky; the reply carries the warning. set needs policy scope."
+    zh_Hans: "Per-channel outreach settings. action=get lists channels with prompt and post_access (full_access | approve_required). action=set edits one channel: `post_access=full_access` queues drafts without human approve; `approve_required` waits for approve. Prefer post_access; `auto` bool is a legacy synonym (true=full_access). Turning full_access on for a community platform is allowed but risky; the reply carries the warning. set needs policy scope."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "set"], "default": "get"}, "channel": {"type": "string"}, "prompt": {"type": "string"}, "auto": {"type": "boolean"}, "active": {"type": "boolean"}}, "required": ["product_id"]}
-  llm_prompt: Get or set per-channel roam outreach settings. Use only for the linked Viewfy user.
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "set"], "default": "get"}, "channel": {"type": "string", "description": "Required for set."}, "prompt": {"type": "string", "description": "Replaces the channel prompt."}, "post_access": {"type": "string", "enum": ["full_access", "approve_required"], "description": "full_access = draft job queues without approve; approve_required = human approve first."}, "auto": {"type": "boolean", "description": "Legacy synonym: true=full_access, false=approve_required."}, "active": {"type": "boolean"}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Get or set per-channel roam outreach settings. Use only for the linked Viewfy user.
 execution:
   python:
     path: roam.py
