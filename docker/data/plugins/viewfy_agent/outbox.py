@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 log = logging.getLogger("viewfy_agent.outbox")
 
 POLL_SEC = 20
+DELIVER_RETRIES = 2  # attempts after the first (= 3 total)
+DELIVER_RETRY_SEC = 3.0
 
 REWRITE_SYSTEM = """You are Viewfy, chatting with a young YC founder over Telegram.
 
@@ -260,6 +262,28 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
     return text
 
 
+async def _deliver_with_retries(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
+    attempts = 1 + DELIVER_RETRIES
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            return await deliver(plugin, item)
+        except Exception as e:
+            last = e
+            if i + 1 >= attempts:
+                break
+            log.warning(
+                "outbox deliver retry id=%s attempt=%s/%s err=%s",
+                item.get("id"),
+                i + 1,
+                attempts,
+                e,
+            )
+            await asyncio.sleep(DELIVER_RETRY_SEC * (i + 1))
+    assert last is not None
+    raise last
+
+
 async def poll_once(plugin: ViewfyAgentPlugin) -> int:
     out = await plugin._request("POST", "/api/telegram/agent/outbox/claim", query={"limit": "10"})
     if out.get("_http_status"):
@@ -270,7 +294,7 @@ async def poll_once(plugin: ViewfyAgentPlugin) -> int:
     for item in items:
         item_id = item.get("id")
         try:
-            text = await deliver(plugin, item)
+            text = await _deliver_with_retries(plugin, item)
             await plugin._request(
                 "POST",
                 f"/api/telegram/agent/outbox/{item_id}/ack",
