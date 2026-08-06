@@ -136,8 +136,19 @@ async def rewrite(
     for bad in ("action_id",):
         if bad in text:
             text = text.replace(bad, "")
+    text = _scrub_dashes(text)
     limit = 2000 if kind == "daily_digest" else 800
     return text[:limit]
+
+
+def _scrub_dashes(text: str) -> str:
+    """Models ignore the no-em-dash rule; force ASCII hyphen before send."""
+    return (
+        (text or "")
+        .replace("\u2014", "-")  # em dash
+        .replace("\u2013", "-")  # en dash
+        .replace("\u2212", "-")  # minus
+    )
 
 
 def _build_markup(
