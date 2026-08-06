@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: report
+  label:
+    en_US: report
+    zh_Hans: report
+  description:
+    en_US: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, roam posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + roam_queue by hand."
+    zh_Hans: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, roam posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + roam_queue by hand."
+spec:
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "day": {"type": "string", "description": "UTC calendar day YYYY-MM-DD (default yesterday)."}}, "required": ["product_id"], "additionalProperties": false}
+  llm_prompt: >-
+    On-demand morning growth report (same facts as the cron Telegram digest). Use for morning
+    report / daily status / what happened while shipping. Optional day=YYYY-MM-DD (default
+    yesterday). Rewrite diegetically like the outbox morning path: open with "morning. here is
+    {day}, while you were shipping.", one short line per non-empty section, keep link and sales
+    separate, close with what needs them or go build. Do not invent metrics. Do not stitch from
+    stats + links + roam_queue. If needs_approval, tell them drafts are waiting and offer to
+    show approvals — do not invent that a Review drafts button was sent unless it was.
+execution:
+  python:
+    path: report.py
+    attr: ReportTool

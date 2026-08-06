@@ -29,6 +29,7 @@ READ_ONLY: frozenset[str] = frozenset(
         "campaigns",
         "issues",
         "products",
+        "report",
         "roam_queue",
         "stats",
     }

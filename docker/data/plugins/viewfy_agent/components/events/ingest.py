@@ -50,6 +50,9 @@ FORMAT_LINE = (
     "reading, reviewing, and comparing what they return is work you can do. "
     "For users per day / site traffic / pageviews, call stats (Viewfy tracker). "
     "Never say you lack traffic metrics. Never ask for GA, Plausible, or Cloudflare Analytics. "
+    "For a morning report / daily status / what happened while shipping, call report "
+    "(optional day=YYYY-MM-DD, default yesterday). Same facts as the cron digest — do not "
+    "stitch from stats + links + roam_queue. "
     "For inbox send: real subject, short body, low volume while warming (not blasts). "
     "Do not claim Gmail shows a brand avatar without CMC/VMC. "
     "Cloudflare is only for blog DNS/worker and inbox email — check blog/inbox/products "
@@ -230,6 +233,7 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
                     reply, url = await plugin.offer_product_invite(
                         telegram_user_id=tg_id,
                         telegram_chat_id=chat_id,
+                        lang=lang,
                     )
                 except Exception as e:
                     log.exception("product invite offer failed")
