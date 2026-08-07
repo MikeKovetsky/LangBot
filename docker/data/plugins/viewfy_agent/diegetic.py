@@ -26,41 +26,67 @@ Rules:
 """
 
 
+def _hours(facts: dict[str, Any]) -> int:
+    try:
+        secs = int(facts.get("expires_in") or 0)
+    except (TypeError, ValueError):
+        secs = 0
+    if secs <= 0:
+        return 48
+    return max(1, (secs + 3599) // 3600)
+
+
+def _fallback(kind: str, facts: dict[str, Any], lang: str) -> str:
+    import i18n
+
+    lang_n = i18n.normalize_lang(lang)
+    if kind == "product_invite":
+        return i18n.invite_offer(
+            lang_n,
+            name=str(facts.get("product_name") or ""),
+            domain=str(facts.get("product_domain") or ""),
+            hours=_hours(facts),
+        )
+    return i18n.connect_offer(lang_n)
+
+
 async def rewrite_offer(
     plugin: ViewfyAgentPlugin,
     *,
     kind: str,
     facts: dict[str, Any],
+    lang: str = "en",
 ) -> str:
     """Rewrite facts to chat copy. URL is stripped from the prompt and appended after."""
     from langbot_plugin.api.entities.builtin.provider import message as provider_message
+    import i18n
 
     url = (facts.get("url") or "").strip()
     safe = {k: v for k, v in facts.items() if k != "url"}
+    lang_n = i18n.normalize_lang(lang)
     model = (plugin.llm_model_uuid or "").strip()
     if not model:
-        # Minimal fallback without hardcoded product marketing — still append URL.
-        name = facts.get("product_name") or "the product"
-        if kind == "product_invite":
-            text = f"You're in the group for {name}. Tap the link to join and link Telegram."
-        else:
-            text = "Link Telegram to Viewfy to continue."
-        return _with_url(text, url)
+        return _with_url(_fallback(kind, facts, lang_n), url)
+
+    system = OFFER_SYSTEM
+    if lang_n != "en":
+        system = system.rstrip() + "\n\n" + i18n.prompt_lang_line(lang_n)
 
     msg = await plugin.invoke_llm(
         llm_model_uuid=model,
         messages=[
-            provider_message.Message(role="system", content=OFFER_SYSTEM),
+            provider_message.Message(role="system", content=system),
             provider_message.Message(
                 role="user",
                 content=(
                     "Rewrite these facts into a short diegetic Telegram offer.\n"
+                    f"{i18n.prompt_lang_line(lang_n)}\n"
                     f"kind: {kind}\n"
                     f"facts_json: {json.dumps(safe, ensure_ascii=False)}"
                 ),
             ),
         ],
-        extra_args={"temperature": 0.6, "max_tokens": 180},
+        extra_args={"max_tokens": 180},
     )
     text = (msg.content or "").strip() if hasattr(msg, "content") else str(msg).strip()
     if isinstance(text, list):
@@ -72,12 +98,14 @@ async def rewrite_offer(
                 parts.append(str(getattr(p, "text", p)))
         text = "".join(parts).strip()
     if not text:
-        raise RuntimeError("empty LLM rewrite")
+        return _with_url(_fallback(kind, facts, lang_n), url)
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     # Strip any hallucinated URL lines; we append the real one.
     lines = [ln for ln in text.splitlines() if not ln.strip().startswith(("http://", "https://"))]
     text = "\n".join(lines).strip()[:800]
+    if not text:
+        return _with_url(_fallback(kind, facts, lang_n), url)
     return _with_url(text, url)
 
 

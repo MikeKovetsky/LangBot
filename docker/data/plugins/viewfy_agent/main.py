@@ -382,7 +382,7 @@ class ViewfyAgentPlugin(BasePlugin):
 
         lang_n = self.remember_lang(telegram_user_id, lang or self.lang_for(telegram_user_id))
         facts = await diegetic.prepare_connect_facts(self, telegram_user_id=telegram_user_id, lang=lang_n)
-        text = await diegetic.rewrite_offer(self, kind="connect_offer", facts=facts)
+        text = await diegetic.rewrite_offer(self, kind="connect_offer", facts=facts, lang=lang_n)
         return text, str(facts["url"])
 
     async def offer_product_invite(
@@ -390,16 +390,20 @@ class ViewfyAgentPlugin(BasePlugin):
         *,
         telegram_user_id: str,
         telegram_chat_id: str,
+        lang: str | None = None,
     ) -> tuple[str, str]:
         """Mint product invite facts + diegetic rewrite for an unlinked speaker in a pinned group."""
         import diegetic
 
+        lang_n = self.remember_lang(telegram_user_id, lang or self.lang_for(telegram_user_id))
         facts = await diegetic.mint_product_invite_facts(
             self,
             telegram_user_id=telegram_user_id,
             telegram_chat_id=telegram_chat_id,
         )
-        text = await diegetic.rewrite_offer(self, kind="product_invite", facts=facts)
+        text = await diegetic.rewrite_offer(
+            self, kind="product_invite", facts=facts, lang=lang_n
+        )
         return text, str(facts["url"])
 
     async def offer_connect(
@@ -412,7 +416,7 @@ class ViewfyAgentPlugin(BasePlugin):
 
         lang_n = self.remember_lang(telegram_user_id, lang or self.lang_for(telegram_user_id))
         facts = await diegetic.prepare_connect_facts(self, telegram_user_id=telegram_user_id, lang=lang_n)
-        text = await diegetic.rewrite_offer(self, kind="connect_offer", facts=facts)
+        text = await diegetic.rewrite_offer(self, kind="connect_offer", facts=facts, lang=lang_n)
         return text, str(facts["url"])
 
     async def send_connect_message(
@@ -577,6 +581,7 @@ class ViewfyAgentPlugin(BasePlugin):
                         text, url = await self.offer_product_invite(
                             telegram_user_id=telegram_user_id,
                             telegram_chat_id=chat,
+                            lang=lang,
                         )
                         if chat:
                             await self.send_connect_message(

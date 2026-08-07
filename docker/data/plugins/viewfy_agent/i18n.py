@@ -116,6 +116,26 @@ def not_linked_nostart(lang: Lang) -> str:
     return t(lang, "not_linked_nostart")
 
 
+def invite_offer(
+    lang: Lang,
+    *,
+    name: str,
+    domain: str = "",
+    hours: int = 48,
+) -> str:
+    """Canned product-invite paywall (fallback when LLM rewrite is unavailable)."""
+    label = (name or "").strip() or "the product"
+    body = t(lang, "invite_offer").format(name=label, hours=max(1, int(hours)))
+    dom = (domain or "").strip()
+    if dom:
+        return f"{body}\n\n{dom}"
+    return body
+
+
+def connect_offer(lang: Lang) -> str:
+    return t(lang, "connect_offer")
+
+
 def prompt_lang_line(lang: Lang) -> str:
     name = LANG_NAMES.get(lang, "English")
     return (
@@ -141,6 +161,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pr_btn": "Open PR",
         "post_btn": "Read the post",
         "invite_btn": "Join product",
+        "invite_offer": "You're in for {name}. {hours} hours to claim it.",
+        "connect_offer": "Link Telegram to Viewfy to continue.",
         "thread_btn": "Open thread",
         "open_btn": "Open",
         "approve_btn": "Approve",
@@ -178,6 +200,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pr_btn": "Відкрити PR",
         "post_btn": "Читати пост",
         "invite_btn": "Приєднатись",
+        "invite_offer": "Тебе запрошено в {name}. {hours} год, щоб прийняти.",
+        "connect_offer": "Привʼяжи Telegram до Viewfy, щоб продовжити.",
         "thread_btn": "Відкрити тред",
         "open_btn": "Відкрити",
         "approve_btn": "Approve",
@@ -215,6 +239,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pr_btn": "Открыть PR",
         "post_btn": "Читать пост",
         "invite_btn": "Присоединиться",
+        "invite_offer": "Тебя пригласили в {name}. {hours} часов, чтобы принять.",
+        "connect_offer": "Привяжи Telegram к Viewfy, чтобы продолжить.",
         "thread_btn": "Открыть тред",
         "open_btn": "Открыть",
         "approve_btn": "Approve",

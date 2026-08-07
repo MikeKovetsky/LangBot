@@ -117,7 +117,7 @@ async def rewrite(
                 role="user", content=_facts_user_message(kind, payload, lang_n)
             ),
         ],
-        extra_args={"temperature": 0.6, "max_tokens": max_tokens},
+        extra_args={"max_tokens": max_tokens},
     )
     text = (msg.content or "").strip() if hasattr(msg, "content") else str(msg).strip()
     if isinstance(text, list):
