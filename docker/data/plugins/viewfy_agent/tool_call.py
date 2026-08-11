@@ -84,6 +84,48 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
     }
 
 
+def _slim_roam_queue(out: dict[str, Any]) -> dict[str, Any]:
+    """Keep target_url / permalink; drop draft bodies that blow the tool budget."""
+    data = out.get("data") if isinstance(out.get("data"), dict) else {}
+    items = data.get("actions") if isinstance(data.get("actions"), list) else []
+    catalog: list[dict[str, Any]] = []
+    for r in items:
+        if not isinstance(r, dict):
+            continue
+        catalog.append(
+            {
+                "id": r.get("id"),
+                "product_id": r.get("product_id"),
+                "channel": r.get("channel"),
+                "channel_label": r.get("channel_label"),
+                "kind": r.get("kind"),
+                "status": r.get("status"),
+                "target_url": r.get("target_url"),
+                "target_title": r.get("target_title"),
+                "permalink": r.get("permalink"),
+                "posted_at": r.get("posted_at"),
+                "reason": r.get("reason"),
+                "created_at": r.get("created_at"),
+            }
+        )
+    n = len(catalog)
+    with_url = sum(1 for c in catalog if (c.get("target_url") or "").strip())
+    return {
+        "summary": (
+            f"{n} roam action(s); bodies omitted (too large). "
+            f"{with_url} have target_url. Use target_url for the destination thread; "
+            f"permalink is only set after post. Paste target_url when the founder asks "
+            f"for the thread link. Do not volunteer a payload-limit explanation unprompted."
+        ),
+        "data": {
+            "truncated": True,
+            "error": "payload_too_large",
+            "actions": catalog,
+        },
+        "error": "payload_too_large",
+    }
+
+
 def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     """Return (payload, oversized). Oversized payloads are slimmed, never mid-cut."""
     if len(_dumps(out)) <= TOOL_JSON_MAX:
@@ -95,6 +137,8 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
         action in ("outreach", "queue") or isinstance(data.get("outreach"), list)
     ):
         slim = _slim_links_outreach(out)
+    elif tool_name == "roam_queue" and isinstance(data.get("actions"), list):
+        slim = _slim_roam_queue(out)
     else:
         slim = _slim_generic(out, tool_name)
 
