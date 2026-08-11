@@ -6,10 +6,10 @@ metadata:
     en_US: blog
     zh_Hans: blog
   description:
-    en_US: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. Domains stay on the web app."
-    zh_Hans: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. Domains stay on the web app."
+    en_US: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. action=set with `brief` and nothing else writes the standing blog brief: what this blog should cover, house facts the agent cannot know (an API, a product line, a claim only they can make), subjects to stay off. Use it whenever a founder says what the blog should or should not write about; it steers the topic plan and every future post, never the published ones. action=list returns the current brief. Domains stay on the web app."
+    zh_Hans: "Blog CMS. action=list/get read posts. action=write generates and publishes a new post: the first one is free with no card, after that it is part of part time. Preview first, then confirm=true after the founder agrees; poll list until the keyword appears (minutes). action=update revises a post from a plain-language prompt; poll get until updated_at moves. action=status published|draft hides or restores a post. action=set changes posts_per_day/active (policy scope) or watermark/lang. action=set with `brief` and nothing else writes the standing blog brief: what this blog should cover, house facts the agent cannot know (an API, a product line, a claim only they can make), subjects to stay off. Use it whenever a founder says what the blog should or should not write about; it steers the topic plan and every future post, never the published ones. action=list returns the current brief. Domains stay on the web app."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "post_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "get", "write", "update", "status", "set"], "default": "list"}, "confirm": {"type": "boolean", "default": false, "description": "write only: true starts generation after the founder agreed to the preview"}, "topic": {"type": "string", "description": "write: steer the post subject/title"}, "keyword": {"type": "string", "description": "write: primary keyword (defaults from topic)"}, "angle": {"type": "string", "description": "write: one-sentence claim the post makes"}, "prompt": {"type": "string", "description": "update: the change to make, in plain language"}, "status": {"type": "string", "enum": ["published", "draft"], "description": "status: target state"}, "watermark": {"type": "boolean", "description": "set"}, "lang": {"type": "string", "description": "set: language code"}}, "required": ["product_id"], "additionalProperties": false}
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "post_id": {"type": "string"}, "action": {"type": "string", "enum": ["list", "get", "write", "update", "status", "set"], "default": "list"}, "confirm": {"type": "boolean", "default": false, "description": "write only: true starts generation after the founder agreed to the preview"}, "topic": {"type": "string", "description": "write: steer the post subject/title"}, "keyword": {"type": "string", "description": "write: primary keyword (defaults from topic)"}, "angle": {"type": "string", "description": "write: one-sentence claim the post makes"}, "prompt": {"type": "string", "description": "update: the change to make, in plain language"}, "status": {"type": "string", "enum": ["published", "draft"], "description": "status: target state"}, "watermark": {"type": "boolean", "description": "set"}, "lang": {"type": "string", "description": "set: language code"}, "brief": {"type": "string", "description": "set: the whole standing blog brief, replacing what is there. Read it with action=list first and fold the founder's new request into it rather than dropping their earlier instructions. Empty clears."}}, "required": ["product_id"], "additionalProperties": false}
   llm_prompt: >-
     Blog CMS for the linked Viewfy user. Response includes host.cloudflare / dns_status - use
     that before claiming Cloudflare is not connected. action=list or get reads posts.
@@ -25,10 +25,18 @@ spec:
     updated_at changes; if it does not, the revision failed its checks and the post is
     unchanged. action=status with status=draft hides a post from the live blog, published
     restores it. There is no separate "save as draft" when writing: write publishes, then
-    status=draft unpublishes if the founder wants it held back. action=set here only changes
-    watermark or lang. Changing how many posts per day, or turning the blog on or off, cannot be
-    done from Telegram - that is on the dashboard. The first post is free with no card; after
-    that writing is part of part time and the write is refused, which you should say plainly.
+    status=draft unpublishes if the founder wants it held back. action=set here changes
+    watermark, lang, or brief. Changing how many posts per day, or turning the blog on or off,
+    cannot be done from Telegram - that is on the dashboard. The brief is the founder's standing
+    instruction for what this blog covers: house facts you cannot know (an API of theirs, a
+    product line, a claim only they can make), angles they want, subjects to stay off. When they
+    say what the blog should or should not write about, that is the brief. Read the current one
+    with action=list, fold their new words into it, and send the whole thing back with
+    action=set brief - never send only the new sentence, because it replaces what is there. It
+    steers the topic plan and every future post, so tell them it changes what he writes next,
+    not what is already published; use action=update for a post that already exists. The first
+    post is free with no card; after that writing is part of part time and the write is refused,
+    which you should say plainly.
 execution:
   python:
     path: blog.py
