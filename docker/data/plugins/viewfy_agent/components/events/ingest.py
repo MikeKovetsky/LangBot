@@ -21,6 +21,9 @@ import i18n  # noqa: E402
 log = logging.getLogger("viewfy_agent.ingest")
 
 CLOCK_PREFIX = "Clock:"
+GROUP_CTX_PREFIX = "Recent group chat"
+GROUP_CTX_LINES = 12
+GROUP_CTX_LINE_CHARS = 300
 
 
 def _clock_line(plugin, tg_id: str) -> str:
@@ -139,6 +142,46 @@ def _sender_id_from_prompt_event(event) -> str:
     if session.startswith("person_"):
         return session.split("_", 1)[-1]
     return ""
+
+
+async def _group_context_block(plugin, chat_id: str, current_text: str) -> str:
+    """Ambient group chatter as one labeled system block.
+
+    LangBot's conversation only holds turns that triggered the bot; messages
+    between other humans never reach it, so pronouns like "покажи його" lose
+    their referent. Viewfy's message store has every inbound row — pull the
+    recent ones for this chat and label speakers.
+    """
+    try:
+        out = await plugin._request(
+            "GET",
+            "/api/telegram/agent/messages",
+            query={"telegram_chat_id": chat_id, "limit": "20"},
+        )
+    except Exception:
+        log.exception("group context fetch failed")
+        return ""
+    if out.get("_http_status"):
+        return ""
+
+    cur = (current_text or "").strip()
+    lines: list[str] = []
+    for row in out.get("items") or []:
+        if (row.get("direction") or "") != "in":
+            continue
+        text = (row.get("text") or "").strip()
+        if not text or text == cur:
+            continue
+        who = (row.get("sender_name") or "").strip() or f"tg:{row.get('telegram_user_id')}"
+        lines.append(f"[{who}]: {text[:GROUP_CTX_LINE_CHARS]}")
+    lines = lines[-GROUP_CTX_LINES:]
+    if not lines:
+        return ""
+    return (
+        f"{GROUP_CTX_PREFIX} (ambient context, oldest first; most of these were "
+        "not addressed to you and need no reply, but the current message may "
+        "refer to them):\n" + "\n".join(lines)
+    )
 
 
 async def _inject_recent_outs(plugin, tg_id: str, event) -> None:
@@ -348,10 +391,12 @@ class IngestListener(EventListener):
 
             prompts = list(event.default_prompt or [])
             # Replaced, not appended: a turn rebuilds this prompt once per tool
-            # round and stale clocks would pile up inside one conversation.
+            # round and stale clocks / group snapshots would pile up inside one
+            # conversation.
             prompts = [
                 m for m in prompts
                 if not str(getattr(m, "content", "") or "").startswith(CLOCK_PREFIX)
+                and not str(getattr(m, "content", "") or "").startswith(GROUP_CTX_PREFIX)
             ]
             prompts.append(
                 provider_message.Message(role="system", content=_clock_line(self.plugin, tg_id))
@@ -404,6 +449,13 @@ class IngestListener(EventListener):
                     None,
                 )
             )
+
+            # Groups: absorb chatter that never triggered the bot (labeled by sender).
+            if is_group and chat_id:
+                block = await _group_context_block(self.plugin, chat_id, user_text)
+                if block:
+                    prompts.append(provider_message.Message(role="system", content=block))
+
             lang = "en"
             if tg_id:
                 lang = self.plugin.remember_lang(
