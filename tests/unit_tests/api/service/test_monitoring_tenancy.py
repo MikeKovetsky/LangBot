@@ -158,6 +158,47 @@ async def test_tool_call_inherits_context_from_connection_message_row(service):
     assert tool_calls[0]['message_id'] == message_id
 
 
+async def test_tool_call_inherits_context_from_session_id_only(service):
+    context = _context(WORKSPACE_A)
+    message_id = await _record_message(service, context, 'session inherit')
+
+    await service.record_tool_call(
+        context,
+        tool_name='search',
+        tool_source='native',
+        duration=12,
+        session_id='same-session',
+    )
+
+    tool_calls, total = await service.get_tool_calls(context)
+    assert total == 1
+    assert tool_calls[0]['pipeline_id'] == 'same-pipeline'
+    assert tool_calls[0]['bot_id'] == 'same-bot'
+    assert tool_calls[0]['session_id'] == 'same-session'
+    assert tool_calls[0]['message_id'] == message_id
+
+
+async def test_tool_call_survives_a_string_context_row(service):
+    context = _context(WORKSPACE_A)
+
+    async def fake_ctx(*_a, **_k):
+        return 'message-id-as-string'
+
+    service._get_message_for_tool_context = fake_ctx
+    await service.record_tool_call(
+        context,
+        tool_name='search',
+        tool_source='native',
+        duration=12,
+        session_id='same-session',
+        pipeline_id='passed-pipeline',
+    )
+
+    tool_calls, total = await service.get_tool_calls(context)
+    assert total == 1
+    assert tool_calls[0]['pipeline_id'] == 'passed-pipeline'
+
+
 async def test_feedback_upsert_and_cancel_are_workspace_scoped(service):
     context_a = _context(WORKSPACE_A)
     context_b = _context(WORKSPACE_B)

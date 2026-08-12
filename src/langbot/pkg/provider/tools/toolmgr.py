@@ -230,6 +230,7 @@ class ToolManager:
                 status=status,
                 bot_id=getattr(query, 'bot_uuid', None),
                 bot_name=bot_name,
+                pipeline_id=getattr(query, 'pipeline_uuid', None),
                 pipeline_name=pipeline_name,
                 session_id=self._get_query_session_id(query),
                 message_id=message_id,

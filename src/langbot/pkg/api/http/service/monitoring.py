@@ -44,6 +44,27 @@ def _workspace_transaction(method):
     return wrapped
 
 
+def _as_message_context(row):
+    """Normalize a monitoring-message lookup into named fields.
+
+    Persistence Core-vs-ORM result shape can unwrap to the first column (the
+    message id string). Never treat a bare string as a message.
+    """
+    if row is None or isinstance(row, (str, bytes, int)):
+        return None
+    mapping = getattr(row, '_mapping', None)
+    if mapping is not None:
+        from types import SimpleNamespace
+
+        return SimpleNamespace(**dict(mapping))
+    if isinstance(row, tuple) and row:
+        first = row[0]
+        if isinstance(first, (str, bytes, int)):
+            return None
+        return _as_message_context(first)
+    return row
+
+
 class MonitoringService:
     """Monitoring service"""
 
@@ -365,7 +386,7 @@ class MonitoringService:
             )
             row = result.first()
             if row:
-                return row
+                return _as_message_context(row)
 
         if not session_id:
             return None
@@ -385,7 +406,7 @@ class MonitoringService:
         result = await self.ap.persistence_mgr.execute_async(user_query)
         row = result.first()
         if row:
-            return row
+            return _as_message_context(row)
 
         any_query = (
             sqlalchemy.select(*context_columns)
@@ -397,8 +418,7 @@ class MonitoringService:
             .limit(1)
         )
         result = await self.ap.persistence_mgr.execute_async(any_query)
-        row = result.first()
-        return row
+        return _as_message_context(result.first())
 
     # ========== Recording Methods ==========
 
@@ -517,10 +537,12 @@ class MonitoringService:
     ) -> str:
         """Record a tool call."""
         workspace_uuid = self._require_write_context(context)
-        context_message = await self._get_message_for_tool_context(
-            context,
-            message_id=message_id,
-            session_id=session_id,
+        context_message = _as_message_context(
+            await self._get_message_for_tool_context(
+                context,
+                message_id=message_id,
+                session_id=session_id,
+            )
         )
         if context_message:
             bot_id = bot_id or context_message.bot_id
