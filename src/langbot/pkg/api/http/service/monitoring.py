@@ -545,12 +545,12 @@ class MonitoringService:
             )
         )
         if context_message:
-            bot_id = bot_id or context_message.bot_id
-            bot_name = bot_name or context_message.bot_name
-            pipeline_id = pipeline_id or context_message.pipeline_id
-            pipeline_name = pipeline_name or context_message.pipeline_name
-            session_id = session_id or context_message.session_id
-            message_id = message_id or context_message.id
+            bot_id = bot_id or getattr(context_message, 'bot_id', None)
+            bot_name = bot_name or getattr(context_message, 'bot_name', None)
+            pipeline_id = pipeline_id or getattr(context_message, 'pipeline_id', None)
+            pipeline_name = pipeline_name or getattr(context_message, 'pipeline_name', None)
+            session_id = session_id or getattr(context_message, 'session_id', None)
+            message_id = message_id or getattr(context_message, 'id', None)
 
         call_id = str(uuid.uuid4())
         call_data = {

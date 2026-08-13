@@ -178,6 +178,27 @@ async def test_tool_call_inherits_context_from_session_id_only(service):
     assert tool_calls[0]['message_id'] == message_id
 
 
+async def test_tool_call_survives_context_row_without_pipeline_id(service):
+    context = _context(WORKSPACE_A)
+
+    async def fake_ctx(*_a, **_k):
+        return SimpleNamespace(bot_id='same-bot', bot_name='Same Bot')
+
+    service._get_message_for_tool_context = fake_ctx
+    await service.record_tool_call(
+        context,
+        tool_name='search',
+        tool_source='native',
+        duration=12,
+        session_id='same-session',
+        pipeline_id='passed-pipeline',
+    )
+
+    tool_calls, total = await service.get_tool_calls(context)
+    assert total == 1
+    assert tool_calls[0]['pipeline_id'] == 'passed-pipeline'
+
+
 async def test_tool_call_survives_a_string_context_row(service):
     context = _context(WORKSPACE_A)
 
