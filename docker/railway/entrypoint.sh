@@ -7,14 +7,23 @@
 # looks healthy to Railway while answering nobody.
 set -e
 
-PLUGIN_DIR=/app/data/plugins/viewfy_agent
+# langbot_plugin validates the directory name against the manifest identity
+# (author__name), so the old viewfy_agent name no longer launches. Carry the
+# volume state (data/user_lang.json, settings.json) across the rename once.
+PLUGIN_DIR=/app/data/plugins/viewfy__viewfy-agent
+LEGACY_DIR=/app/data/plugins/viewfy_agent
+
+if [ -d "$LEGACY_DIR" ] && [ ! -d "$PLUGIN_DIR" ]; then
+  mv "$LEGACY_DIR" "$PLUGIN_DIR"
+fi
+rm -rf "$LEGACY_DIR"
 
 mkdir -p "$PLUGIN_DIR"
 
 # Code comes from the image; the plugin's own state does not. data/ holds
 # user_lang.json, which a founder built up one message at a time, and settings.json
 # is written below from env - a blanket copy would clobber both on every deploy.
-find /app/plugin-src/viewfy_agent -mindepth 1 -maxdepth 1 \
+find /app/plugin-src/viewfy__viewfy-agent -mindepth 1 -maxdepth 1 \
   ! -name data ! -name settings.json \
   -exec cp -R {} "$PLUGIN_DIR"/ \;
 mkdir -p "$PLUGIN_DIR/data"

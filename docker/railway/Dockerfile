@@ -16,7 +16,8 @@ COPY src/langbot/pkg/pipeline/wrapper/wrapper.py /app/src/langbot/pkg/pipeline/w
 # The plugin ships in the image, not the volume: /app/data is the Railway volume
 # mount and would shadow anything baked underneath it. The entrypoint syncs this
 # into place on every boot, so a deploy updates the code.
-COPY docker/data/plugins/viewfy_agent /app/plugin-src/viewfy_agent
+# Directory is author__name; langbot_plugin validates it against the manifest.
+COPY docker/data/plugins/viewfy__viewfy-agent /app/plugin-src/viewfy__viewfy-agent
 
 COPY docker/railway/entrypoint.sh /app/railway-entrypoint.sh
 RUN chmod +x /app/railway-entrypoint.sh
