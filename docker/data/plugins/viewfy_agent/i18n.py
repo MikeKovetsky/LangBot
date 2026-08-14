@@ -136,6 +136,11 @@ def connect_offer(lang: Lang) -> str:
     return t(lang, "connect_offer")
 
 
+def wake_hint(lang: Lang) -> str:
+    """How to get a reply in a group. Appended verbatim, never LLM-rewritten."""
+    return t(lang, "wake_hint")
+
+
 def prompt_lang_line(lang: Lang) -> str:
     name = LANG_NAMES.get(lang, "English")
     return (
@@ -185,6 +190,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "Those full emails are too chunky for one Telegram reply. "
             "Name one site (like smash.vc) and I'll paste that draft."
         ),
+        "wake_hint": (
+            "In groups I only answer when addressed: tag @viewfy_ai_bot, "
+            "reply to one of my messages, or say \"viewfy\"."
+        ),
     },
     "ua": {
         "warm": (
@@ -224,6 +233,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "Усі повні імейли разом не влазять в один меседж. "
             "Назви один сайт (типу smash.vc) — скину той драфт."
         ),
+        "wake_hint": (
+            "У групах я відповідаю тільки коли до мене звертаються: тегни "
+            "@viewfy_ai_bot, відповідай на моє повідомлення або напиши «вюфай»."
+        ),
     },
     "ru": {
         "warm": (
@@ -262,6 +275,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "tool_payload_too_large": (
             "Все полные имейлы разом не влезают в одно сообщение. "
             "Назови один сайт (типа smash.vc) — скину тот драфт."
+        ),
+        "wake_hint": (
+            "В группах я отвечаю только когда ко мне обращаются: тегни "
+            "@viewfy_ai_bot, ответь на моё сообщение или напиши «вюфай»."
         ),
     },
 }

@@ -30,6 +30,8 @@ Rules:
 - If needs_approval is true (and kind is not daily_digest), say a draft is ready. Do not say
   "reply approve or reject" (Approve/Reject buttons are attached).
 - If kind is product_invite_accepted / outcome accepted: say they are in on the product, briefly.
+  Name the person ONLY as member_name spells it, verbatim. If member_name is missing, say it
+  without any name. Never guess or invent a name.
 - If kind is pr_ready / outcome open: say the SEO fix PR is live on GitHub. Do not paste the URL
   (a button is attached). Mention repo or PR number lightly if useful.
 - If kind is blog_published / outcome published: the post the founder asked for is live on
@@ -217,6 +219,12 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
         text = _compose_approval(intro, payload)
     else:
         text = intro
+
+    # New members don't know the group wake rules; state them verbatim once.
+    if kind == "product_invite_accepted" and chat_id.startswith("-"):
+        import i18n
+
+        text = f"{text}\n\n{i18n.wake_hint(lang)}"
 
     # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on roam.
     markup = _build_markup(payload, lang, kind=kind)

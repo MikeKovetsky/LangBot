@@ -186,6 +186,24 @@ class TelegramMessageConverter(abstract_platform_adapter.AbstractMessageConverte
             ):
                 message_components.append(platform_message.At(target=bot_account_id))
 
+            # Carry the quoted message itself. Without it, replies like "не бачу
+            # тут згадки" reach the LLM with no referent for "тут". Context only:
+            # a failure here must never break conversion of the message itself.
+            try:
+                reply_text = getattr(reply, 'text', None) or getattr(reply, 'caption', None) or ''
+                if reply_text:
+                    message_components.append(
+                        platform_message.Quote(
+                            id=getattr(reply, 'message_id', None),
+                            sender_id=getattr(reply_from, 'id', None) if reply_from else None,
+                            origin=platform_message.MessageChain(
+                                [platform_message.Plain(text=reply_text[:600])]
+                            ),
+                        )
+                    )
+            except Exception:
+                pass
+
         if message.text:
             message_text = message.text
             message_components.extend(parse_message_text(message_text))

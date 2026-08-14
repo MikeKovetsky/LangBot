@@ -198,6 +198,24 @@ class ViewfyAgentPlugin(BasePlugin):
         if key:
             self._turn[key] = {"tools": set(), "declined": False}
 
+    def set_quote(self, chat_id: str | int | None, quote: dict[str, Any] | None) -> None:
+        """Stash the replied-to message for this chat's turn.
+
+        PromptPreProcessing cannot see the message chain out-of-process, so the
+        inbound handler parks the quote here and the prompt hook collects it.
+        """
+        key = str(chat_id or "").split("#", 1)[0]
+        if key:
+            self.turn_state(key)["quote"] = quote
+
+    def get_quote(self, chat_id: str | int | None) -> dict[str, Any] | None:
+        """Read-only: the prompt rebuilds once per tool round and needs it each time.
+        turn_start clears it when the next inbound message opens a new turn."""
+        key = str(chat_id or "").split("#", 1)[0]
+        if not key:
+            return None
+        return self.turn_state(key).get("quote")
+
     def turn_state(self, chat_id: str | int | None) -> dict[str, Any]:
         key = str(chat_id or "").split("#", 1)[0]
         if not key:
@@ -348,7 +366,7 @@ class ViewfyAgentPlugin(BasePlugin):
         def do() -> dict[str, Any]:
             req = urllib.request.Request(url, data=data, headers=self._headers(bearer), method=method)
             try:
-                with urllib.request.urlopen(req, timeout=90) as resp:
+                with urllib.request.urlopen(req, timeout=120) as resp:
                     raw = resp.read().decode() or "{}"
                     return json.loads(raw)
             except urllib.error.HTTPError as e:
@@ -359,6 +377,18 @@ class ViewfyAgentPlugin(BasePlugin):
                     parsed = {"detail": err_body or str(e)}
                 parsed["_http_status"] = e.code
                 return parsed
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                # A client-side timeout says nothing about the server, which may
+                # still finish and commit. Never report it as a plain failure.
+                return {
+                    "_http_status": 0,
+                    "detail": (
+                        "Request timed out or the connection dropped before a "
+                        "response arrived. The change MAY still have been applied "
+                        "on the server. Read the current state back before "
+                        f"retrying or reporting failure. ({e})"
+                    ),
+                }
 
         return await asyncio.to_thread(do)
 

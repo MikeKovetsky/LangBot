@@ -22,6 +22,7 @@ log = logging.getLogger("viewfy_agent.ingest")
 
 CLOCK_PREFIX = "Clock:"
 GROUP_CTX_PREFIX = "Recent group chat"
+QUOTE_PREFIX = "Replying to"
 GROUP_CTX_LINES = 12
 GROUP_CTX_LINE_CHARS = 300
 
@@ -85,11 +86,32 @@ def _plain_text(message_chain) -> str:
         return ""
     parts: list[str] = []
     for component in message_chain:
+        if isinstance(component, platform_message.Quote):
+            continue  # the quoted original is context, not this message's text
         if isinstance(component, platform_message.Plain):
             parts.append(component.text or "")
         elif hasattr(component, "text") and getattr(component, "text", None):
             parts.append(str(component.text))
     return "".join(parts).strip()
+
+
+def _quote_of(message_chain) -> dict | None:
+    """The replied-to message from the chain's Quote component, if any."""
+    if message_chain is None:
+        return None
+    for component in message_chain:
+        if isinstance(component, platform_message.Quote):
+            text = _plain_text(component.origin)
+            if not text:
+                return None
+            return {
+                "message_id": str(component.id) if component.id is not None else None,
+                "sender_id": str(component.sender_id)
+                if component.sender_id is not None
+                else None,
+                "text": text,
+            }
+    return None
 
 
 def _message_text(content) -> str:
@@ -180,7 +202,9 @@ async def _group_context_block(plugin, chat_id: str, current_text: str) -> str:
     return (
         f"{GROUP_CTX_PREFIX} (ambient context, oldest first; most of these were "
         "not addressed to you and need no reply, but the current message may "
-        "refer to them):\n" + "\n".join(lines)
+        "refer to them. Exception: if the CURRENT speaker sent you a clear, "
+        "still-unanswered request moments before this message, handle that "
+        "request too instead of silently skipping it):\n" + "\n".join(lines)
     )
 
 
@@ -235,6 +259,8 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
     tg_id = str(event.sender_id)
     chat_id = str(event.launcher_id).split("#", 1)[0]
     plugin.turn_start(chat_id)
+    quote = _quote_of(event.message_chain)
+    plugin.set_quote(chat_id, quote)
     lang = plugin.remember_lang(
         tg_id,
         i18n.resolve_lang(
@@ -244,13 +270,17 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
         ),
     )
 
+    meta = {"event": event_name, "lang": lang, "group": is_group}
+    if quote:
+        meta["reply_to_message_id"] = quote.get("message_id")
+        meta["reply_to_snippet"] = quote["text"][:300]
     await plugin.ingest(
         telegram_user_id=tg_id,
         telegram_chat_id=chat_id,
         direction="in",
         text=text,
         telegram_message_id=_message_id(event.message_chain),
-        meta={"event": event_name, "lang": lang, "group": is_group},
+        meta=meta,
     )
 
     # Unlinked + pinned group: mint product invite (diegetic) before the LLM runs.
@@ -317,6 +347,11 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
         reply, url = await plugin.start_reply(tg_id, lang)
     except Exception as e:
         reply = i18n.prepare_fail(lang, str(e))
+
+    if is_group:
+        # In a group nothing tells a new user the bot only answers when
+        # addressed; say it once, verbatim.
+        reply = f"{reply}\n\n{i18n.wake_hint(lang)}"
 
     sent = await plugin.send_connect_message(chat_id, reply, url, lang=lang)
     if not sent:
@@ -397,10 +432,23 @@ class IngestListener(EventListener):
                 m for m in prompts
                 if not str(getattr(m, "content", "") or "").startswith(CLOCK_PREFIX)
                 and not str(getattr(m, "content", "") or "").startswith(GROUP_CTX_PREFIX)
+                and not str(getattr(m, "content", "") or "").startswith(QUOTE_PREFIX)
             ]
             prompts.append(
                 provider_message.Message(role="system", content=_clock_line(self.plugin, tg_id))
             )
+            quote = self.plugin.get_quote(chat_id)
+            if quote:
+                prompts.append(
+                    provider_message.Message(
+                        role="system",
+                        content=(
+                            f"{QUOTE_PREFIX}: the current message is a Telegram reply "
+                            f"to this earlier message: \"{quote['text'][:600]}\". "
+                            "Words like 'this', 'here', 'it' likely point at it."
+                        ),
+                    )
+                )
             if FORMAT_LINE not in _content_blob(prompts):
                 prompts.append(provider_message.Message(role="system", content=FORMAT_LINE))
             caps = side_effect.capability_line()

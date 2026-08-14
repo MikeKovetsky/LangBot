@@ -98,15 +98,24 @@ async def rewrite_offer(
                 parts.append(str(getattr(p, "text", p)))
         text = "".join(parts).strip()
     if not text:
-        return _with_url(_fallback(kind, facts, lang_n), url)
+        return _with_url(_wake(_fallback(kind, facts, lang_n), kind, lang_n), url)
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     # Strip any hallucinated URL lines; we append the real one.
     lines = [ln for ln in text.splitlines() if not ln.strip().startswith(("http://", "https://"))]
     text = "\n".join(lines).strip()[:800]
     if not text:
-        return _with_url(_fallback(kind, facts, lang_n), url)
-    return _with_url(text, url)
+        return _with_url(_wake(_fallback(kind, facts, lang_n), kind, lang_n), url)
+    return _with_url(_wake(text, kind, lang_n), url)
+
+
+def _wake(text: str, kind: str, lang: str) -> str:
+    """Group invitees don't know the wake rules; say them verbatim, never rewritten."""
+    import i18n
+
+    if kind != "product_invite":
+        return text
+    return f"{text}\n\n{i18n.wake_hint(lang)}"
 
 
 def _with_url(text: str, url: str) -> str:
