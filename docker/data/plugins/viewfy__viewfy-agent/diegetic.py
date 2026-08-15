@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import ViewfyAgentPlugin
 
 log = logging.getLogger("viewfy_agent.diegetic")
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_UNTIL_CLOSE = re.compile(r"^.*?</think>", re.DOTALL | re.IGNORECASE)
 
 OFFER_SYSTEM = """You are Viewfy, chatting with a young YC founder over Telegram.
 
@@ -99,6 +103,9 @@ async def rewrite_offer(
         text = "".join(parts).strip()
     if not text:
         return _with_url(_wake(_fallback(kind, facts, lang_n), kind, lang_n), url)
+    text = _strip_think(text)
+    if not text:
+        return _with_url(_wake(_fallback(kind, facts, lang_n), kind, lang_n), url)
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     # Strip any hallucinated URL lines; we append the real one.
@@ -107,6 +114,13 @@ async def rewrite_offer(
     if not text:
         return _with_url(_wake(_fallback(kind, facts, lang_n), kind, lang_n), url)
     return _with_url(_wake(text, kind, lang_n), url)
+
+
+def _strip_think(text: str) -> str:
+    """Grok reasoning is wrapped in <think> when Remove CoT is off on invoke_llm."""
+    text = _THINK_BLOCK.sub("", text or "")
+    text = _THINK_UNTIL_CLOSE.sub("", text)
+    return text.strip()
 
 
 def _wake(text: str, kind: str, lang: str) -> str:

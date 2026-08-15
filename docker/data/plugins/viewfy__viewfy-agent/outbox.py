@@ -4,12 +4,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import ViewfyAgentPlugin
 
 log = logging.getLogger("viewfy_agent.outbox")
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_UNTIL_CLOSE = re.compile(r"^.*?</think>", re.DOTALL | re.IGNORECASE)
 
 POLL_SEC = 20
 DELIVER_RETRIES = 2  # attempts after the first (= 3 total)
@@ -132,6 +136,9 @@ async def rewrite(
         text = "".join(parts).strip()
     if not text:
         raise RuntimeError("empty LLM rewrite")
+    text = _strip_think(text)
+    if not text:
+        raise RuntimeError("empty LLM rewrite")
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     # Never let a confused rewrite leak ids
@@ -141,6 +148,13 @@ async def rewrite(
     text = _scrub_dashes(text)
     limit = 2000 if kind == "daily_digest" else 800
     return text[:limit]
+
+
+def _strip_think(text: str) -> str:
+    """Grok reasoning is wrapped in <think> when Remove CoT is off on invoke_llm."""
+    text = _THINK_BLOCK.sub("", text or "")
+    text = _THINK_UNTIL_CLOSE.sub("", text)
+    return text.strip()
 
 
 def _scrub_dashes(text: str) -> str:
