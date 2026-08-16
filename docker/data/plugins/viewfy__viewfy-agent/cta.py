@@ -81,14 +81,8 @@ def keyboard(rows: list[list[dict[str, Any]]]) -> dict[str, Any]:
     return {"inline_keyboard": rows}
 
 
-def strip_urls(text: str) -> str:
-    """Remove markdown links and bare https URLs from copy (buttons carry them)."""
-    if not text:
-        return ""
-    out = _MD_LINK_RE.sub("", text)
-    out = _BARE_URL_RE.sub("", out)
-    # Collapse leftover blank lines
-    lines = [ln.rstrip() for ln in out.splitlines()]
+def _collapse_blank_lines(text: str) -> str:
+    lines = [ln.rstrip() for ln in (text or "").splitlines()]
     cleaned: list[str] = []
     blank = False
     for ln in lines:
@@ -100,6 +94,29 @@ def strip_urls(text: str) -> str:
         blank = False
         cleaned.append(ln)
     return "\n".join(cleaned).strip()
+
+
+def strip_urls(text: str) -> str:
+    """Remove markdown links and bare https URLs from copy (buttons carry them).
+
+    Fenced draft/code bodies stay literal. An Open-thread button used to run this
+    over the whole card and delete `[Viewfy](https://viewfy.ai?ref=…)` from the
+    quoted draft, which is the text the founder approves.
+    """
+    if not text:
+        return ""
+    if not fences_balanced(text):
+        return text
+    parts: list[str] = []
+    pos = 0
+    for m in _FENCE_RE.finditer(text):
+        outside = _MD_LINK_RE.sub("", text[pos : m.start()])
+        parts.append(_BARE_URL_RE.sub("", outside))
+        parts.append(m.group(0))
+        pos = m.end()
+    tail = _MD_LINK_RE.sub("", text[pos:])
+    parts.append(_BARE_URL_RE.sub("", tail))
+    return _collapse_blank_lines("".join(parts))
 
 
 def extract_links(text: str) -> list[tuple[str, str]]:
