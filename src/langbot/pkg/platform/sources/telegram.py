@@ -423,7 +423,7 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             try:
                 raw = (query.data or '').strip()
                 # Viewfy inline CTAs:
-                #   vf:approve:<uuid> / vf:reject:<uuid> — roam draft decisions
+                #   vf:approve:<uuid> / vf:reject:<uuid> — scout draft decisions
                 #   vf:queue:<product_uuid> — morning digest → unified approvals
                 if (
                     raw.startswith('vf:approve:')
@@ -467,7 +467,7 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
                         action_id = raw.split(':', 2)[2].strip()
                         if not action_id:
                             return
-                        # Diegetic label in chat edit; LLM gets action_id for roam_approve.
+                        # Diegetic label in chat edit; LLM gets action_id for scout_approve.
                         try:
                             mark = '✅' if decision == 'approve' else '✕'
                             original_text = query.message.text or ''

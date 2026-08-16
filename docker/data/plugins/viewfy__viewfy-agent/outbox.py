@@ -42,7 +42,7 @@ Rules:
   their blog. Name the title, one line. Do not paste the URL (a button is attached).
 - If kind is daily_digest / outcome morning: this is the morning report. Open like
   "morning. here is {day}, while you were shipping." then short lines for each non-empty
-  section (visitors, signups, citations, post, ads total, link building, sales, roam).
+  section (visitors, signups, citations, post, ads total, link building, sales, scout).
   Keep link and sales clearly separate. If needs_you is present, end with what needs them;
   otherwise close with go build. Quiet day if almost nothing landed.
 - For non-digest kinds: keep replies tight, 1-2 short lines.
@@ -240,7 +240,7 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
 
         text = f"{text}\n\n{i18n.wake_hint(lang)}"
 
-    # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on roam.
+    # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on scout.
     markup = _build_markup(payload, lang, kind=kind)
 
     # Prefer Bot API HTML so links + preformatted draft render even without markdown_card.

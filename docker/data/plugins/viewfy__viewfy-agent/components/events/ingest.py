@@ -68,7 +68,7 @@ FORMAT_LINE = (
     "scout_approve with that id and decision immediately (skip scout_queue). "
     "If they type approve/reject without an id, call scout_queue then scout_approve. "
     "If the founder message is 'show approvals product_id=...', call approvals with that "
-    "product_id immediately and list every pending draft (link, sales, roam)."
+    "product_id immediately and list every pending draft (link, sales, scout)."
 )
 
 GROUP_LINE = (

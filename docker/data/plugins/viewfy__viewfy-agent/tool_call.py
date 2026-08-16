@@ -84,7 +84,7 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
     }
 
 
-def _slim_roam_queue(out: dict[str, Any]) -> dict[str, Any]:
+def _slim_scout_queue(out: dict[str, Any]) -> dict[str, Any]:
     """Keep target_url / permalink; drop draft bodies that blow the tool budget."""
     data = out.get("data") if isinstance(out.get("data"), dict) else {}
     items = data.get("actions") if isinstance(data.get("actions"), list) else []
@@ -112,7 +112,7 @@ def _slim_roam_queue(out: dict[str, Any]) -> dict[str, Any]:
     with_url = sum(1 for c in catalog if (c.get("target_url") or "").strip())
     return {
         "summary": (
-            f"{n} roam action(s); bodies omitted (too large). "
+            f"{n} scout action(s); bodies omitted (too large). "
             f"{with_url} have target_url. Use target_url for the destination thread; "
             f"permalink is only set after post. Paste target_url when the founder asks "
             f"for the thread link. Do not volunteer a payload-limit explanation unprompted."
@@ -138,7 +138,7 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
     ):
         slim = _slim_links_outreach(out)
     elif tool_name in ("scout_queue", "roam_queue") and isinstance(data.get("actions"), list):
-        slim = _slim_roam_queue(out)
+        slim = _slim_scout_queue(out)
     else:
         slim = _slim_generic(out, tool_name)
 

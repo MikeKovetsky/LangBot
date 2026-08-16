@@ -6,8 +6,8 @@ metadata:
     en_US: report
     zh_Hans: report
   description:
-    en_US: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, roam posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + scout_queue by hand."
-    zh_Hans: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, roam posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + scout_queue by hand."
+    en_US: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, scout posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + scout_queue by hand."
+    zh_Hans: "On-demand morning growth report for a product (same facts as the cron Telegram digest): visitors, citations, link/sales outreach, scout posts, published blog post, and what still needs approve. Use when the founder asks for a morning report, daily status, or what happened while they were shipping. Optional day=YYYY-MM-DD (default yesterday). Do not stitch this from stats + links + scout_queue by hand."
 spec:
   parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "day": {"type": "string", "description": "UTC calendar day YYYY-MM-DD (default yesterday)."}}, "required": ["product_id"], "additionalProperties": false}
   llm_prompt: >-
