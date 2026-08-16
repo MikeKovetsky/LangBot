@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Tool
 metadata:
-  name: roam
+  name: scout
   label:
-    en_US: roam
-    zh_Hans: roam
+    en_US: scout
+    zh_Hans: scout
   description:
     en_US: "Per-channel outreach settings. action=get lists channels with prompt and post_access (full_access | approve_required), plus the product-level hunt brief. action=revise is how a founder changes how the agent writes on a channel: pass their words as `feedback` ('keep it all lowercase', 'stop naming the product') and it is merged into that channel's brief, rewriting the lines it contradicts. Use revise for every wording, tone, length, or disclosure request; never hand-write a whole brief into `prompt`. It applies to future drafts only, not to drafts already awaiting approval. action=set edits one channel: `post_access=full_access` queues drafts without human approve; `approve_required` waits for approve. Prefer post_access; `auto` bool is a legacy synonym (true=full_access). Turning full_access on for a community platform is allowed but risky; the reply carries the warning. action=set with `hunt` and no channel writes the hunt brief \u2014 the founder's own map of where the ICP lives and which thread shapes discovery should chase; it steers thread scouting for all channels. set needs policy scope; revise needs write."
     zh_Hans: "Per-channel outreach settings. action=get lists channels with prompt and post_access (full_access | approve_required), plus the product-level hunt brief. action=revise is how a founder changes how the agent writes on a channel: pass their words as `feedback` ('keep it all lowercase', 'stop naming the product') and it is merged into that channel's brief, rewriting the lines it contradicts. Use revise for every wording, tone, length, or disclosure request; never hand-write a whole brief into `prompt`. It applies to future drafts only, not to drafts already awaiting approval. action=set edits one channel: `post_access=full_access` queues drafts without human approve; `approve_required` waits for approve. Prefer post_access; `auto` bool is a legacy synonym (true=full_access). Turning full_access on for a community platform is allowed but risky; the reply carries the warning. action=set with `hunt` and no channel writes the hunt brief \u2014 the founder's own map of where the ICP lives and which thread shapes discovery should chase; it steers thread scouting for all channels. set needs policy scope; revise needs write."
 spec:
-  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "revise", "set"], "default": "get"}, "channel": {"type": "string", "enum": ["reddit", "hn", "indiehackers", "dev", "blog_comment", "directory", "sos", "email_reply", "email_outreach"], "description": "Required for revise, and for set except hunt."}, "feedback": {"type": "string", "description": "revise: what to change about the writing, in the founder's own words. Merged into the channel brief, not appended."}, "prompt": {"type": "string", "description": "set: replaces the whole channel brief. Prefer action=revise for anything a founder said in passing."}, "hunt": {"type": "string", "description": "Product-level hunt brief for thread discovery (set without channel). Empty string clears it."}, "post_access": {"type": "string", "enum": ["full_access", "approve_required"], "description": "full_access = draft job queues without approve; approve_required = human approve first."}, "auto": {"type": "boolean", "description": "Legacy synonym: true=full_access, false=approve_required."}, "active": {"type": "boolean"}, "daily_cap": {"type": "integer", "description": "Per-channel daily cap override (1-50): ceiling on new candidates per day and pending unapproved drafts."}}, "required": ["product_id"], "additionalProperties": false}
+  parameters: {"type": "object", "properties": {"product_id": {"type": "string"}, "action": {"type": "string", "enum": ["get", "revise", "set"], "default": "get"}, "channel": {"type": "string", "enum": ["reddit", "hn", "indiehackers", "dev", "producthunt", "quora", "x", "linkedin", "threads", "facebook", "blog_comment", "directory", "sos", "email_reply", "email_outreach"], "description": "Required for revise, and for set except hunt."}, "feedback": {"type": "string", "description": "revise: what to change about the writing, in the founder's own words. Merged into the channel brief, not appended."}, "prompt": {"type": "string", "description": "set: replaces the whole channel brief. Prefer action=revise for anything a founder said in passing."}, "hunt": {"type": "string", "description": "Product-level hunt brief for thread discovery (set without channel). Empty string clears it."}, "post_access": {"type": "string", "enum": ["full_access", "approve_required"], "description": "full_access = draft job queues without approve; approve_required = human approve first."}, "auto": {"type": "boolean", "description": "Legacy synonym: true=full_access, false=approve_required."}, "active": {"type": "boolean"}, "daily_cap": {"type": "integer", "description": "Per-channel daily cap override (1-50): ceiling on new candidates per day and pending unapproved drafts."}}, "required": ["product_id"], "additionalProperties": false}
   llm_prompt: >-
-    Read or change per-channel roam outreach settings. Use only for the linked Viewfy user. When
-    the founder says anything about how the agent should write on a channel (all lowercase, keep
-    it shorter, stop naming the product, drop the sign-off), call action=revise with that
+    Read or change per-channel scout outreach settings. Use only for the linked Viewfy user.
+    When the founder says anything about how the agent should write on a channel (all lowercase,
+    keep it shorter, stop naming the product, drop the sign-off), call action=revise with that
     channel and their own words as feedback: it merges the request into the channel's standing
     brief so every future draft follows it. Say it applies to future drafts, not to ones already
     waiting for approval. If it fails, the brief is unchanged, so say that instead of claiming
@@ -21,5 +21,5 @@ spec:
     chat does not have; do not offer it.
 execution:
   python:
-    path: roam.py
-    attr: RoamTool
+    path: scout.py
+    attr: ScoutTool

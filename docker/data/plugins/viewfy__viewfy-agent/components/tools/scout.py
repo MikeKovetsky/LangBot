@@ -12,10 +12,10 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 import tool_call  # noqa: E402
 
-TOOL_NAME = "roam_queue"
+TOOL_NAME = "scout"
 
 
-class RoamQueueTool(Tool):
+class ScoutTool(Tool):
     async def call(
         self,
         params: dict[str, Any],

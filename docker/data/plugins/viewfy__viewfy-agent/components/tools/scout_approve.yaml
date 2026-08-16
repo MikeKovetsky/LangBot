@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: scout_approve
+  label:
+    en_US: scout_approve
+    zh_Hans: scout_approve
+  description:
+    en_US: "Approve or reject a pending roam draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it. Never invent an action_id."
+    zh_Hans: "Approve or reject a pending roam draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it. Never invent an action_id."
+spec:
+  parameters: {"type": "object", "properties": {"action_id": {"type": "string", "description": "Roam action id from scout_queue."}, "decision": {"type": "string", "enum": ["approve", "reject"], "default": "approve"}}, "required": ["action_id"], "additionalProperties": false}
+  llm_prompt: >-
+    Approve or reject a pending scout draft. Pass action_id from scout_queue. Never invent ids.
+    Never show action ids in chat.
+execution:
+  python:
+    path: scout_approve.py
+    attr: ScoutApproveTool

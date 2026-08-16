@@ -16,8 +16,8 @@ WRITE_CAPABLE: frozenset[str] = frozenset(
         "links",
         "product_invite",
         "product_members",
-        "roam",
-        "roam_approve",
+        "scout",
+        "scout_approve",
         "scrape",
         "variants",
     }
@@ -30,7 +30,7 @@ READ_ONLY: frozenset[str] = frozenset(
         "issues",
         "products",
         "report",
-        "roam_queue",
+        "scout_queue",
         "stats",
     }
 )
