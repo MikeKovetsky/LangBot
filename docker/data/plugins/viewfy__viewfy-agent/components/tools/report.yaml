@@ -16,7 +16,7 @@ spec:
     yesterday). Rewrite diegetically like the outbox morning path: open with "morning. here is
     {day}, while you were shipping.", one short line per non-empty section, keep link and sales
     separate, close with what needs them or go build. Do not invent metrics. Do not stitch from
-    stats + links + roam_queue. If needs_approval, tell them drafts are waiting and offer to
+    stats + links + scout_queue. If needs_approval, tell them drafts are waiting and offer to
     show approvals — do not invent that a Review drafts button was sent unless it was.
 execution:
   python:

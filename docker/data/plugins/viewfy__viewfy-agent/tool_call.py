@@ -137,7 +137,7 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
         action in ("outreach", "queue") or isinstance(data.get("outreach"), list)
     ):
         slim = _slim_links_outreach(out)
-    elif tool_name == "roam_queue" and isinstance(data.get("actions"), list):
+    elif tool_name in ("scout_queue", "roam_queue") and isinstance(data.get("actions"), list):
         slim = _slim_roam_queue(out)
     else:
         slim = _slim_generic(out, tool_name)

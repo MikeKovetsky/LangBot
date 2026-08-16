@@ -13,7 +13,7 @@ spec:
   llm_prompt: >-
     Everything waiting on the founder, across every motion — link-building pitches, sales emails
     and roam comments. Use this whenever they ask to see all drafts, or what is pending, or
-    "show me the drafts". `links` and `roam_queue` each return only their own slice, so
+    "show me the drafts". `links` and `scout_queue` each return only their own slice, so
     answering "all drafts" from either one looks complete while hiding the rest. Each item
     carries approve_with, naming the tool that approves it. Print the body when the founder
     wants to read one. Report exactly what the call returns and nothing else. Group them by what
