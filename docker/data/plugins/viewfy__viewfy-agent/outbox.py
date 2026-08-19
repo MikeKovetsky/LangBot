@@ -19,6 +19,26 @@ POLL_SEC = 20
 DELIVER_RETRIES = 2  # attempts after the first (= 3 total)
 DELIVER_RETRY_SEC = 3.0
 
+# Telegram reports "group chat was deleted" even when the chat still exists
+# and getChatMember is `left` / `kicked`. Do not DM-fallback those.
+_GROUP_GONE = (
+    "group chat was deleted",
+    "bot was kicked",
+    "bot is not a member",
+    "chat not found",
+)
+
+
+class GroupGone(RuntimeError):
+    """Bot cannot send to this group; pin should be dropped."""
+
+
+def _group_gone(chat_id: str, description: str | None) -> bool:
+    if not str(chat_id).startswith("-"):
+        return False
+    hay = (description or "").lower()
+    return any(s in hay for s in _GROUP_GONE)
+
 REWRITE_SYSTEM = """You are Viewfy, chatting with a young YC founder over Telegram.
 
 Voice: peer founder, not coach or corporate SaaS. Short, direct, slightly sharp.
@@ -33,6 +53,10 @@ Rules:
 - Do NOT invent numbers. Only report counts present in facts_json. Omit zero/missing sections.
 - If needs_approval is true (and kind is not daily_digest), say a draft is ready. Do not say
   "reply approve or reject" (Approve/Reject buttons are attached).
+- If rung_phrase is present, say what the comment does in plain language
+  (just advice / names the product / includes a link). If menu_phrase is present, say what
+  that community allows (advice-only / name but no link / name and a link). Never say
+  "rung", "1-3", "1-4", or "room 1-3".
 - If kind is product_invite_accepted / outcome accepted: say they are in on the product, briefly.
   Name the person ONLY as member_name spells it, verbatim. If member_name is missing, say it
   without any name. Never guess or invent a name.
@@ -262,7 +286,10 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
         out = await plugin._tg("sendMessage", body)
         sent = bool(out.get("ok"))
         if not sent:
-            log.warning("outbox HTML send failed: %s", out.get("description"))
+            desc = out.get("description")
+            log.warning("outbox HTML send failed: %s", desc)
+            if _group_gone(chat_id, desc):
+                raise GroupGone(str(desc or "bot left group"))
 
     if not sent:
         from langbot_plugin.api.entities.builtin.platform import message as platform_message
@@ -301,6 +328,8 @@ async def _deliver_with_retries(plugin: ViewfyAgentPlugin, item: dict[str, Any])
     for i in range(attempts):
         try:
             return await deliver(plugin, item)
+        except GroupGone:
+            raise
         except Exception as e:
             last = e
             if i + 1 >= attempts:
