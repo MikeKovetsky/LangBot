@@ -26,40 +26,46 @@ def _dumps(out: dict[str, Any]) -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
+def _slim_links_item(r: dict[str, Any]) -> dict[str, Any]:
+    """Keep cut body + details; drop the nested metrics blob if we must shrink."""
+    return {
+        "id": r.get("id"),
+        "domain": r.get("domain"),
+        "to": r.get("to"),
+        "subject": r.get("subject"),
+        "status": r.get("status"),
+        "kind": r.get("kind"),
+        "score": r.get("score"),
+        "rank": r.get("rank"),
+        "ghost": r.get("ghost"),
+        "details": r.get("details"),
+        "body": r.get("body"),
+        "body_truncated": r.get("body_truncated"),
+        "body_chars": r.get("body_chars"),
+    }
+
+
 def _slim_links_outreach(out: dict[str, Any]) -> dict[str, Any]:
-    """Drop email bodies so a queue/outreach list fits the tool budget."""
+    """List stay cut-body + details; full email is action=get, not this catalog."""
     data = out.get("data") if isinstance(out.get("data"), dict) else {}
-    items = data.get("outreach") if isinstance(data.get("outreach"), list) else []
-    catalog: list[dict[str, Any]] = []
-    for r in items:
-        if not isinstance(r, dict):
-            continue
-        catalog.append(
-            {
-                "id": r.get("id"),
-                "domain": r.get("domain"),
-                "to": r.get("to"),
-                "subject": r.get("subject"),
-                "status": r.get("status"),
-                "kind": r.get("kind"),
-            }
-        )
+    raw = data.get("outreach")
+    items = raw if isinstance(raw, list) else ([raw] if isinstance(raw, dict) else [])
+    catalog = [_slim_links_item(r) for r in items if isinstance(r, dict)]
     domains = [c["domain"] for c in catalog if c.get("domain")]
-    domain_hint = ", ".join(domains[:8]) if domains else "a domain from the list"
+    domain_hint = ", ".join(str(d) for d in domains[:8]) if domains else "a domain from the list"
     return {
         "summary": (
-            f"{len(catalog)} outreach draft(s) listed (subjects only; bodies omitted — too large). "
-            f"Domains: {domain_hint}. Use this catalog for status/counts. "
-            f"Only if the founder asked to read a draft, call again with domain=<one domain> "
-            f"for full subject+body. Do not invent email text. Do not volunteer the "
-            f"payload-limit explanation unprompted."
+            f"{len(catalog)} outreach row(s) with cut bodies and details. "
+            f"Domains: {domain_hint}. Print the cut body and details line. "
+            f"Call action=get with outreach_id or domain= for one full email. "
+            f"Do not invent email text."
         ),
         "data": {
             "action": data.get("action") or "outreach",
             "truncated": True,
             "error": "payload_too_large",
             "outreach": catalog,
-            "hint": "pass domain= to fetch one full email body",
+            "hint": "action=get outreach_id= or domain= for the full body",
         },
         "error": "payload_too_large",
     }
@@ -133,7 +139,10 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
 
     data = out.get("data") if isinstance(out.get("data"), dict) else {}
     action = (data.get("action") or "").lower()
-    if tool_name == "links" and (
+    if tool_name == "links" and action == "get":
+        # One full email is the get payload; do not strip it into a catalog.
+        slim = _slim_generic(out, tool_name)
+    elif tool_name == "links" and (
         action in ("outreach", "queue") or isinstance(data.get("outreach"), list)
     ):
         slim = _slim_links_outreach(out)
@@ -144,6 +153,17 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
 
     if len(_dumps(slim)) <= TOOL_JSON_MAX:
         return slim, True
+
+    # Second pass: keep details, shrink bodies further.
+    nested = slim.get("data") if isinstance(slim.get("data"), dict) else {}
+    rows = nested.get("outreach") if isinstance(nested.get("outreach"), list) else []
+    if rows:
+        for r in rows:
+            if isinstance(r, dict) and isinstance(r.get("body"), str) and len(r["body"]) > 80:
+                r["body"] = r["body"][:80].rstrip() + "…"
+                r["body_truncated"] = True
+        if len(_dumps(slim)) <= TOOL_JSON_MAX:
+            return slim, True
 
     # Last resort: tiny error object.
     return {

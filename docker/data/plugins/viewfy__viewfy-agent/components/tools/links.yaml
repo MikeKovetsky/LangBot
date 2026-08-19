@@ -6,10 +6,10 @@ metadata:
     en_US: links
     zh_Hans: links
   description:
-    en_US: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=outreach: emails drafted/sent (includes full body; pass domain= for one site). action=queue: drafts awaiting approve. action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
-    zh_Hans: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=outreach: emails drafted/sent (includes full body; pass domain= for one site). action=queue: drafts awaiting approve. action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
+    en_US: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=queue: drafts awaiting approve, cut body + details (Fit/DR/traffic/spam/ghost). action=outreach: drafted/sent history, same cut body + details. action=get: ONE full email body (outreach_id from the list, or domain=). action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
+    zh_Hans: "Link-building CMS. action=found: sites discovered (includes pitch brief themes/gaps/hook when researched). action=queue: drafts awaiting approve, cut body + details (Fit/DR/traffic/spam/ghost). action=outreach: drafted/sent history, same cut body + details. action=get: ONE full email body (outreach_id from the list, or domain=). action=approve / reject: send or discard a draft (needs outreach_id). action=stats: counts (sent, replies, reply rate). action=find: optional live SERP search. Never invent domains or email bodies."
 spec:
-  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["found", "outreach", "queue", "stats", "approve", "reject", "find"], "description": "CMS default found. approve/reject need write scope.", "default": "found"}, "product_id": {"type": "string", "description": "Required for CMS actions. Optional for find."}, "purpose": {"type": "string", "enum": ["link", "sales"], "description": "Which outreach the action applies to. Default link.", "default": "link"}, "outreach_id": {"type": "string", "description": "Required for approve/reject. Id from queue/outreach."}, "status": {"type": "string", "description": "Filter found/outreach by status (comma-separated)."}, "kind": {"type": "string", "enum": ["pitch", "followup", "reply"], "description": "outreach filter."}, "type": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}, "domain": {"type": "string"}, "niche": {"type": "string", "description": "Required for find."}, "types": {"type": "array", "items": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}}, "limit": {"type": "integer", "default": 50}, "contacts": {"type": "boolean", "default": true}, "exclude": {"type": "array", "items": {"type": "string"}}}, "required": [], "additionalProperties": false}
+  parameters: {"type": "object", "properties": {"action": {"type": "string", "enum": ["found", "outreach", "queue", "get", "stats", "approve", "reject", "find"], "description": "CMS default found. get needs outreach_id or domain. approve/reject need write scope.", "default": "found"}, "product_id": {"type": "string", "description": "Required for CMS actions. Optional for find."}, "purpose": {"type": "string", "enum": ["link", "sales"], "description": "Which outreach the action applies to. Default link.", "default": "link"}, "outreach_id": {"type": "string", "description": "Required for get/approve/reject. Id from queue/outreach."}, "status": {"type": "string", "description": "Filter found/outreach by status (comma-separated)."}, "kind": {"type": "string", "enum": ["pitch", "followup", "reply"], "description": "outreach filter."}, "type": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}, "domain": {"type": "string"}, "niche": {"type": "string", "description": "Required for find."}, "types": {"type": "array", "items": {"type": "string", "enum": ["guest_post", "resource", "directory", "roundup", "podcast"]}}, "limit": {"type": "integer", "default": 50}, "contacts": {"type": "boolean", "default": true}, "exclude": {"type": "array", "items": {"type": "string"}}}, "required": [], "additionalProperties": false}
   llm_prompt: >-
     Outreach CMS. purpose=link is backlinks / guest posts; purpose=sales is cold outreach to
     companies whose site we checked and found a problem on. They are separate queues: a call
@@ -18,13 +18,15 @@ spec:
     "motion" or "purpose" (or a transliteration) to the founder - name the goal instead, in
     their language, one language per message. action=found: list sites the bot discovered.
     action=stats: how many sent, how many got a reply, reply rate — prefer this for status /
-    "what's next" / task overviews (no email bodies). action=queue: drafts waiting for approve
-    (metadata only). action=outreach: list drafted or sent emails. Without domain=,
-    subjects/metadata only. With domain=, PRINT that one full subject + body. action=approve /
-    reject: needs outreach_id from queue (then send or discard). If data.truncated or
-    error=payload_too_large: use the catalog silently for counts/ status. Only ask which domain
-    to open if the founder explicitly wants to read a draft. Never invent bodies/domains or
-    claim an email was sent unless outreach/stats says so.
+    "what's next" / task overviews (no email bodies). action=queue: drafts waiting for approve,
+    each with a cut body plus details (Fit, DR, traffic, spam, ghost). action=outreach: drafted
+    or sent history, same cut body + details. When they ask to see drafts, print the cut body
+    and the details line; do not invent metrics. action=get: ONE full email — pass outreach_id
+    from the list, or domain= for that site. Use get only when they asked to read the whole
+    pitch. action=approve / reject: needs outreach_id from queue (then send or discard). If
+    data.truncated: the catalog still has cut bodies and details; call get for the full email of
+    one domain. Never invent bodies/domains or claim an email was sent unless outreach/stats/get
+    says so.
 execution:
   python:
     path: links.py
