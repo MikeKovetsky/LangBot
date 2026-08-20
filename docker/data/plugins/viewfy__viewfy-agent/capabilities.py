@@ -7,10 +7,8 @@ from __future__ import annotations
 
 WRITE_CAPABLE: frozenset[str] = frozenset(
     {
-        "audit",
         "blog",
         "connect",
-        "form_pr",
         "group_pin",
         "inbox",
         "links",
@@ -27,7 +25,6 @@ READ_ONLY: frozenset[str] = frozenset(
     {
         "approvals",
         "campaigns",
-        "issues",
         "products",
         "report",
         "scout_queue",

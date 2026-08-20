@@ -155,7 +155,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "en": {
         "warm": (
             "Hey, I'm Viewfy 💙\n\n"
-            "I get you users while you ship: SEO/GEO, audits, fix PRs, blog, ads.\n\n"
+            "I get you users while you ship: find the threads, draft the reply, write the blog.\n\n"
             "Tap Connect Viewfy to link your account, then ask me what's next."
         ),
         "connect_btn": "💙 Connect Viewfy",
@@ -198,7 +198,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "ua": {
         "warm": (
             "Привіт, я Viewfy 💙\n\n"
-            "Я приводжу користувачів, поки ти шипиш: SEO/GEO, аудити, фікс-PR, блог, реклама.\n\n"
+            "Я приводжу користувачів, поки ти шипиш: знаходжу треди, пишу відповідь, веду блог.\n\n"
             "Натисни «Підключити Viewfy», щоб привʼязати акаунт — і питай, що далі."
         ),
         "connect_btn": "💙 Підключити Viewfy",
@@ -241,7 +241,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "ru": {
         "warm": (
             "Привет, я Viewfy 💙\n\n"
-            "Я привожу пользователей, пока ты шипишь: SEO/GEO, аудиты, фикс-PR, блог, реклама.\n\n"
+            "Я привожу пользователей, пока ты шипишь: нахожу треды, пишу ответ, веду блог.\n\n"
             "Нажми «Подключить Viewfy», чтобы привязать аккаунт — и спрашивай, что дальше."
         ),
         "connect_btn": "💙 Подключить Viewfy",

@@ -57,7 +57,6 @@ def html_from_markdownish(text: str) -> str:
 TOOL_CTA = {
     "connect": None,  # label from platform / purpose
     "inbox": "connect_cf_inbox_btn",  # attach → Cloudflare OAuth
-    "form_pr": "pr_btn",
     "product_invite": "invite_btn",
     "product_members": "invite_btn",
 }
@@ -160,8 +159,6 @@ def cta_from_tool(tool: str, payload: dict[str, Any]) -> tuple[str, str] | None:
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
     url = (data.get("url") or data.get("button_url") or "").strip()
     if not url.startswith("https://"):
-        return None
-    if tool == "form_pr" and "github.com" not in url:
         return None
     # inbox: only attach CTA for custom-domain OAuth (action=attach)
     if tool == "inbox" and (data.get("purpose") or "") != "inbox":

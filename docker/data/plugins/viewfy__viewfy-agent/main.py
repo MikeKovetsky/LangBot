@@ -38,7 +38,6 @@ ROLE_EMOJIS: dict[str, tuple[str, ...]] = {
     "wave": ("😜", "😊"),
     "happy": ("😊", "😜"),
     "sad": ("😒",),
-    "audit": ("🔎",),
     "social": ("🔊",),
 }
 

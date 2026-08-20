@@ -196,13 +196,7 @@ async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: 
     label = cta.label_for_tool(tool_name, data, lang)
 
     # Short diegetic line; button carries the link.
-    if tool_name == "form_pr" and data.get("number"):
-        text = (
-            f"PR #{data['number']} готовий 🎉" if lang == "ua"
-            else f"PR #{data['number']} готов 🎉" if lang == "ru"
-            else f"PR #{data['number']} is live 🎉"
-        )
-    elif tool_name == "connect":
+    if tool_name == "connect":
         plat = (data.get("platform") or "account").lower()
         purpose = (data.get("purpose") or "").lower()
         if plat == "cloudflare" and purpose == "inbox":
