@@ -17,6 +17,7 @@ from langbot.pkg.platform.sources.telegram import (
     _decode_telegram_base64_limited,
     _telegram_form_action_from_callback,
     _telegram_select_field_options,
+    vf_decision_edit_kwargs,
 )
 
 
@@ -104,6 +105,30 @@ def _select_form_data() -> dict:
             }
         ],
     }
+
+
+def test_vf_decision_edit_keeps_entities():
+    entity = MagicMock()
+    entity.offset = 0
+    entity.length = 4
+    message = MagicMock()
+    message.text = 'draft ready.\n\n```\nhello\n```'
+    message.entities = [entity]
+
+    kwargs = vf_decision_edit_kwargs(message, 'approve')
+    assert kwargs['text'].endswith('\n\n✅ Approve')
+    assert kwargs['text'].startswith(message.text)
+    assert kwargs['entities'] == [entity]
+    assert kwargs['reply_markup'] is None
+
+
+def test_vf_decision_edit_without_entities_stays_plain():
+    message = MagicMock()
+    message.text = 'quiet morning'
+    message.entities = None
+    kwargs = vf_decision_edit_kwargs(message, 'reject')
+    assert kwargs['text'] == 'quiet morning\n\n✕ Reject'
+    assert 'entities' not in kwargs
 
 
 def test_telegram_select_field_options_are_extracted():

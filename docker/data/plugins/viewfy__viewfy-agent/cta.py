@@ -53,6 +53,38 @@ def html_from_markdownish(text: str) -> str:
     out.append(_html_inline((text or "")[pos:]))
     return "".join(out)
 
+
+# Same specials telegramify_markdown escapes for MarkdownV2.
+_MDV2_SPECIAL = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
+
+
+def _mdv2_escape(s: str) -> str:
+    return _MDV2_SPECIAL.sub(r"\\\1", s or "")
+
+
+def _mdv2_inline(s: str) -> str:
+    parts: list[str] = []
+    pos = 0
+    for m in re.finditer(r"\*\*(.+?)\*\*", s or ""):
+        parts.append(_mdv2_escape(s[pos : m.start()]))
+        parts.append("*" + _mdv2_escape(m.group(1)) + "*")
+        pos = m.end()
+    parts.append(_mdv2_escape((s or "")[pos:]))
+    return "".join(parts)
+
+
+def markdownv2_from_markdownish(text: str) -> str:
+    """MarkdownV2 matching LangBot markdown_card (bold + fenced draft)."""
+    out: list[str] = []
+    pos = 0
+    for m in re.finditer(r"```(?:\w+)?\n(.*?)```", text or "", flags=re.DOTALL):
+        out.append(_mdv2_inline(text[pos : m.start()]))
+        code = (m.group(1) or "").replace("\\", "\\\\").replace("`", "\\`")
+        out.append(f"```\n{code}```")
+        pos = m.end()
+    out.append(_mdv2_inline((text or "")[pos:]))
+    return "".join(out)
+
 # Tools that return a CTA url in data.
 TOOL_CTA = {
     "connect": None,  # label from platform / purpose

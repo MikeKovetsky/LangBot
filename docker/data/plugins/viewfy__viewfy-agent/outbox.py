@@ -33,6 +33,42 @@ class GroupGone(RuntimeError):
     """Bot cannot send to this group; pin should be dropped."""
 
 
+async def _send_formatted(
+    plugin: ViewfyAgentPlugin,
+    chat_id: str,
+    body_text: str,
+    markup: dict[str, Any] | None,
+) -> bool:
+    """MarkdownV2 (markdown_card) → HTML → plain. Always the same chat."""
+    import cta
+
+    attempts: list[tuple[str | None, str]] = [
+        ("MarkdownV2", cta.markdownv2_from_markdownish(body_text)[:4000]),
+        ("HTML", cta.html_from_markdownish(body_text)[:4000]),
+        (None, body_text[:4000]),
+    ]
+    last_desc: str | None = None
+    for parse_mode, payload in attempts:
+        body: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": payload,
+            "disable_web_page_preview": True,
+            "link_preview_options": {"is_disabled": True},
+        }
+        if parse_mode:
+            body["parse_mode"] = parse_mode
+        if markup:
+            body["reply_markup"] = markup
+        out = await plugin._tg("sendMessage", body)
+        if out.get("ok"):
+            return True
+        last_desc = str(out.get("description") or "")
+        log.warning("outbox %s send failed: %s", parse_mode or "plain", last_desc)
+        if _group_gone(chat_id, last_desc):
+            raise GroupGone(last_desc or "bot left group")
+    return False
+
+
 def _group_gone(chat_id: str, description: str | None) -> bool:
     if not str(chat_id).startswith("-"):
         return False
@@ -267,29 +303,19 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
     # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on scout.
     markup = _build_markup(payload, lang, kind=kind)
 
-    # Prefer Bot API HTML so links + preformatted draft render even without markdown_card.
+    # Bot API first so we can attach buttons. MarkdownV2 matches LangBot markdown_card;
+    # HTML then plain+markup stay on the same chat if Telegram rejects the parse mode.
     sent = False
+    chat = chat_id.split("#", 1)[0]
     if getattr(plugin, "bot_token", None):
         body_text = text
         if markup and any(
             "url" in b for row in markup.get("inline_keyboard", []) for b in row
         ):
             body_text = cta.strip_urls(text) or text
-        body: dict[str, Any] = {
-            "chat_id": chat_id,
-            "text": cta.html_from_markdownish(body_text)[:4000],
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        }
-        if markup:
-            body["reply_markup"] = markup
-        out = await plugin._tg("sendMessage", body)
-        sent = bool(out.get("ok"))
+        sent = await _send_formatted(plugin, chat, body_text, markup)
         if not sent:
-            desc = out.get("description")
-            log.warning("outbox HTML send failed: %s", desc)
-            if _group_gone(chat_id, desc):
-                raise GroupGone(str(desc or "bot left group"))
+            log.warning("outbox formatted send failed chat=%s", chat)
 
     if not sent:
         from langbot_plugin.api.entities.builtin.platform import message as platform_message
@@ -298,16 +324,17 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
         if not bot:
             raise RuntimeError("bot_uuid not configured")
         chain = platform_message.MessageChain([platform_message.Plain(text=text)])
+        target_type = "group" if chat.startswith("-") else "person"
         await plugin.send_message(
             bot_uuid=bot,
-            target_type="person",
-            target_id=tg_uid,
+            target_type=target_type,
+            target_id=chat if target_type == "group" else tg_uid,
             message_chain=chain,
         )
 
     await plugin.ingest(
         telegram_user_id=tg_uid,
-        telegram_chat_id=chat_id,
+        telegram_chat_id=chat,
         direction="out",
         text=text,
         meta={

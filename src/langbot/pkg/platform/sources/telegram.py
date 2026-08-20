@@ -65,6 +65,25 @@ def _read_telegram_file_limited(path: str) -> bytes:
     return body
 
 
+def vf_decision_edit_kwargs(message, decision: str) -> dict:
+    """Keep the original Telegram entities when marking Approve/Reject.
+
+    edit_message_text without entities/parse_mode flattens HTML/MarkdownV2
+    (fenced draft + bold) into raw backticks. Offsets stay valid because we
+    only append after the existing text.
+    """
+    mark = '✅' if decision == 'approve' else '✕'
+    original = (getattr(message, 'text', None) or '') if message is not None else ''
+    entities = list(getattr(message, 'entities', None) or [])
+    kwargs: dict = {
+        'text': f'{original}\n\n{mark} {decision.capitalize()}',
+        'reply_markup': None,
+    }
+    if entities:
+        kwargs['entities'] = entities
+    return kwargs
+
+
 def _telegram_select_field_options(form_data: dict) -> tuple[str, list[str]]:
     """Return the active select field and its option values."""
     field_name = str(form_data.get('_current_input_field') or '').strip()
@@ -469,11 +488,8 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
                             return
                         # Diegetic label in chat edit; LLM gets action_id for scout_approve.
                         try:
-                            mark = '✅' if decision == 'approve' else '✕'
-                            original_text = query.message.text or ''
                             await query.edit_message_text(
-                                text=f'{original_text}\n\n{mark} {decision.capitalize()}',
-                                reply_markup=None,
+                                **vf_decision_edit_kwargs(query.message, decision)
                             )
                         except Exception:
                             pass
