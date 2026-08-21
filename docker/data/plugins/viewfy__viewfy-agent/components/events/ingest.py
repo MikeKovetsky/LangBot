@@ -67,6 +67,11 @@ FORMAT_LINE = (
     "If the founder message is 'approve action_id=...' or 'reject action_id=...', call "
     "scout_approve with that id and decision immediately (skip scout_queue). "
     "If they type approve/reject without an id, call scout_queue then scout_approve. "
+    "If they want to change a waiting draft (rewrite this comment, here's the text, make "
+    "this one shorter), call scout_approve decision=edit with that action_id and the full "
+    "new draft_text. Do not use scout action=revise for a single draft: revise is the "
+    "standing brief for future drafts. If they type edit without an id, call scout_queue "
+    "then scout_approve decision=edit. "
     "If the founder message is 'show approvals product_id=...', call approvals with that "
     "product_id immediately and list every pending draft (link, sales, scout)."
 )

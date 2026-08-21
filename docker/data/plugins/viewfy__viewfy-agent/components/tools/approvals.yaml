@@ -17,8 +17,8 @@ spec:
     answering "all drafts" from either one looks complete while hiding the rest. Each item
     carries approve_with, naming the tool that approves it. Print the body when the founder
     wants to read one. Report exactly what the call returns and nothing else. Group them by what
-    they are for - link building, sales, scout comments - in the founder's language, one language
-    per message. "motion" is an internal field name and must never appear in a reply.
+    they are for - link building, sales, scout comments - in the founder's language, one
+    language per message. "motion" is an internal field name and must never appear in a reply.
 execution:
   python:
     path: approvals.py

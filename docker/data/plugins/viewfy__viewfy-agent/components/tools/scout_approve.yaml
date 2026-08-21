@@ -6,13 +6,15 @@ metadata:
     en_US: scout_approve
     zh_Hans: scout_approve
   description:
-    en_US: "Approve or reject a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it. Never invent an action_id."
-    zh_Hans: "Approve or reject a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it. Never invent an action_id."
+    en_US: "Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it; decision=edit replaces this one draft's text (status stays draft) and needs draft_text: the full replacement, in the founder's words or your rewrite of this draft. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
+    zh_Hans: "Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it; decision=edit replaces this one draft's text (status stays draft) and needs draft_text: the full replacement, in the founder's words or your rewrite of this draft. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
 spec:
-  parameters: {"type": "object", "properties": {"action_id": {"type": "string", "description": "Roam action id from scout_queue."}, "decision": {"type": "string", "enum": ["approve", "reject"], "default": "approve"}}, "required": ["action_id"], "additionalProperties": false}
+  parameters: {"type": "object", "properties": {"action_id": {"type": "string", "description": "Roam action id from scout_queue."}, "decision": {"type": "string", "enum": ["approve", "reject", "edit"], "default": "approve"}, "draft_text": {"type": "string", "description": "Required for decision=edit. Full replacement body for this one waiting draft. Does not change the standing channel brief."}}, "required": ["action_id"], "additionalProperties": false}
   llm_prompt: >-
-    Approve or reject a pending scout draft. Pass action_id from scout_queue. Never invent ids.
-    Never show action ids in chat.
+    Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue. Never
+    invent ids. Never show action ids in chat. decision=edit needs the full replacement
+    draft_text for this one waiting draft; it does not change the standing brief (that is scout
+    action=revise).
 execution:
   python:
     path: scout_approve.py
