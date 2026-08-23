@@ -260,49 +260,26 @@ def _build_markup(
     target_url = (payload.get("target_url") or "").strip()
     action_id = (payload.get("action_id") or "").strip()
     if payload.get("needs_approval"):
-        # Two buttons self-serve (the founder is the poster: on X the reply
-        # intent opens the composer with the draft prefilled), three on the
-        # automation rungs — Open thread / Post / Skip, where Post commands
-        # the operator queue. Never both blue rows: three buttons max.
-        primary = None
-        intent = "" if payload.get("operator") else _x_reply_intent(payload)
-        if intent:
-            primary = cta.url_btn(i18n.t(lang, "reply_x_btn"), intent)
-        elif target_url.startswith("https://") and target_url != button_url:
-            primary = cta.url_btn(i18n.t(lang, "thread_btn"), target_url)
-        if primary is not None:
-            rows.append([primary])
+        # One honest set for every plan: Copy draft + Open thread + Skip.
+        # A draft card only exists when the channel's autopost is off, so no
+        # button may read as the bot posting. Copy is omitted only when the
+        # draft exceeds Telegram's 256-char copy_text cap (the fenced block
+        # in the message body stays tap-to-copy there).
+        top = []
+        draft = (payload.get("draft_text") or "").strip()
+        if draft and len(draft) <= 256:
+            top.append(cta.copy_btn(i18n.t(lang, "copy_btn"), draft))
+        if target_url.startswith("https://") and target_url != button_url:
+            top.append(cta.url_btn(i18n.t(lang, "thread_btn"), target_url))
+        if top:
+            rows.append(top)
         if action_id:
-            decide = []
-            if payload.get("operator"):
-                decide.append(
-                    cta.cb_btn(i18n.t(lang, "operator_post_btn"), f"vf:approve:{action_id}", style="success")
-                )
-            decide.append(cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"))
-            rows.append(decide)
+            rows.append([
+                cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"),
+            ])
 
     return cta.keyboard(rows) if rows else None
 
-
-def _x_reply_intent(payload: dict[str, Any]) -> str:
-    """Prefilled X reply composer URL, or "" when it cannot be built.
-
-    The draft is frozen into the button at send time; a chat-edited draft
-    keeps the old text here (the founder sees the final text in the composer
-    and can retype — the card is not resent on edit).
-    """
-    import re
-    from urllib.parse import quote
-
-    if (payload.get("channel_key") or "") != "x":
-        return ""
-    draft = (payload.get("draft_text") or "").strip()
-    if not draft or len(draft) > 500:
-        return ""
-    m = re.search(r"/status/(\d+)", payload.get("target_url") or "")
-    if not m:
-        return ""
-    return f"https://x.com/intent/post?in_reply_to={m.group(1)}&text={quote(draft)}"
 
 
 async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:

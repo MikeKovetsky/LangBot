@@ -101,6 +101,11 @@ def url_btn(text: str, url: str, *, primary: bool = True) -> dict[str, Any]:
     return btn
 
 
+def copy_btn(text: str, value: str) -> dict[str, Any]:
+    """Native clipboard button. Bot API caps copy_text at 256 chars."""
+    return {"text": text[:64], "copy_text": {"text": value[:256]}}
+
+
 def cb_btn(text: str, data: str, *, style: str | None = None) -> dict[str, Any]:
     btn: dict[str, Any] = {"text": text[:64], "callback_data": data[:64]}
     if style:
