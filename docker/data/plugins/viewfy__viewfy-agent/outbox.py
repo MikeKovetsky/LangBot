@@ -88,7 +88,8 @@ Rules:
 - Do NOT include the draft body. Do NOT invent draft text. Framing only.
 - Do NOT invent numbers. Only report counts present in facts_json. Omit zero/missing sections.
 - If needs_approval is true (and kind is not daily_digest), say a draft is ready. Do not say
-  "reply approve or reject" (Approve/Reject buttons are attached).
+  "reply approve or reject" (Queue it / Skip buttons are attached). Never imply the bot
+  posts it: queueing hands the reply to the founder (extension) or the operator to post.
 - If rung_phrase is present, say what the comment does in plain language
   (just advice / names the product / includes a link). If menu_phrase is present, say what
   that community allows (advice-only / name but no link / name and a link). Never say
@@ -257,22 +258,54 @@ def _build_markup(
         return cta.keyboard(rows) if rows else None
 
     target_url = (payload.get("target_url") or "").strip()
-    if (
-        payload.get("needs_approval")
-        and target_url.startswith("https://")
-        and target_url != button_url
-    ):
-        rows.append([cta.url_btn(i18n.t(lang, "thread_btn"), target_url)])
-
     action_id = (payload.get("action_id") or "").strip()
-    if payload.get("needs_approval") and action_id:
-        # Telegram callback_data max 64 bytes; uuid + prefix fits.
-        rows.append([
-            cta.cb_btn(i18n.t(lang, "approve_btn"), f"vf:approve:{action_id}", style="success"),
-            cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"),
-        ])
+    if payload.get("needs_approval"):
+        # Two buttons self-serve (the founder is the poster), three on the
+        # automation rungs (operator=True: Post commands the operator queue).
+        # X gets the reply intent — composer opens with the draft prefilled,
+        # threaded to the tweet, so posting is one tap instead of copy+paste.
+        primary = None
+        intent = _x_reply_intent(payload)
+        if intent:
+            primary = cta.url_btn(i18n.t(lang, "reply_x_btn"), intent)
+        elif target_url.startswith("https://") and target_url != button_url:
+            primary = cta.url_btn(i18n.t(lang, "thread_btn"), target_url)
+        if primary is not None:
+            rows.append([primary])
+        if intent and target_url.startswith("https://") and payload.get("operator"):
+            # Operators read the room before posting; keep the raw thread too.
+            rows.append([cta.url_btn(i18n.t(lang, "thread_btn"), target_url)])
+        if action_id:
+            decide = []
+            if payload.get("operator"):
+                decide.append(
+                    cta.cb_btn(i18n.t(lang, "operator_post_btn"), f"vf:approve:{action_id}", style="success")
+                )
+            decide.append(cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"))
+            rows.append(decide)
 
     return cta.keyboard(rows) if rows else None
+
+
+def _x_reply_intent(payload: dict[str, Any]) -> str:
+    """Prefilled X reply composer URL, or "" when it cannot be built.
+
+    The draft is frozen into the button at send time; a chat-edited draft
+    keeps the old text here (the founder sees the final text in the composer
+    and can retype — the card is not resent on edit).
+    """
+    import re
+    from urllib.parse import quote
+
+    if (payload.get("channel_key") or "") != "x":
+        return ""
+    draft = (payload.get("draft_text") or "").strip()
+    if not draft or len(draft) > 500:
+        return ""
+    m = re.search(r"/status/(\d+)", payload.get("target_url") or "")
+    if not m:
+        return ""
+    return f"https://x.com/intent/post?in_reply_to={m.group(1)}&text={quote(draft)}"
 
 
 async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:

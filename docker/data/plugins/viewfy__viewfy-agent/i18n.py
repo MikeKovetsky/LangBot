@@ -103,7 +103,8 @@ def pr_btn(lang: Lang) -> str:
 
 
 def prepare_fail(lang: Lang, err: str) -> str:
-    return t(lang, "prepare_fail").format(err=err)
+    _ = err
+    return t(lang, "prepare_fail")
 
 
 def not_linked(lang: Lang, url: str = "") -> str:
@@ -123,13 +124,13 @@ def invite_offer(
     domain: str = "",
     hours: int = 48,
 ) -> str:
-    """Canned product-invite paywall (fallback when LLM rewrite is unavailable)."""
+    """Canned product-invite: tap the button to join the team. No TTL/domain noise."""
+    _ = domain, hours
     label = (name or "").strip() or "the product"
-    body = t(lang, "invite_offer").format(name=label, hours=max(1, int(hours)))
-    dom = (domain or "").strip()
-    if dom:
-        return f"{body}\n\n{dom}"
-    return body
+    tpl = t(lang, "invite_offer")
+    if "{name}" in tpl:
+        return tpl.format(name=label)
+    return tpl
 
 
 def connect_offer(lang: Lang) -> str:
@@ -165,18 +166,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "connect_cf_inbox_btn": "Connect Cloudflare for inbox",
         "pr_btn": "Open PR",
         "post_btn": "Read the post",
-        "invite_btn": "Join product",
-        "invite_offer": "You're in for {name}. {hours} hours to claim it.",
+        "invite_btn": "Join",
+        "invite_offer": "I sent you an invite to our team.",
         "connect_offer": "Link Telegram to Viewfy to continue.",
         "thread_btn": "Open thread",
         "open_btn": "Open",
-        "approve_btn": "Approve",
-        "reject_btn": "Reject",
+        "reply_x_btn": "Reply on X",
+        "operator_post_btn": "Post",
+        "approve_btn": "Queue it",
+        "reject_btn": "Skip",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
-            "Couldn't create a connect link right now. "
-            "Try again in a minute. ({err})"
+            "Couldn't create that link. Try again in a minute."
         ),
         "not_linked": (
             "Your Telegram is not linked to Viewfy yet.\n\n"
@@ -209,17 +211,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "pr_btn": "Відкрити PR",
         "post_btn": "Читати пост",
         "invite_btn": "Приєднатись",
-        "invite_offer": "Тебе запрошено в {name}. {hours} год, щоб прийняти.",
+        "invite_offer": "Я вислав тобі інвайт в нашу команду.",
         "connect_offer": "Привʼяжи Telegram до Viewfy, щоб продовжити.",
         "thread_btn": "Відкрити тред",
         "open_btn": "Відкрити",
-        "approve_btn": "Approve",
-        "reject_btn": "Reject",
+        "reply_x_btn": "Відповісти в X",
+        "operator_post_btn": "Опублікувати",
+        "approve_btn": "В чергу",
+        "reject_btn": "Пропустити",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
-            "Не вдалося створити посилання зараз. "
-            "Спробуй ще раз за хвилину. ({err})"
+            "Не вдалося створити посилання. Спробуй ще раз за хвилину."
         ),
         "not_linked": (
             "Telegram ще не привʼязано до Viewfy.\n\n"
@@ -252,17 +255,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "pr_btn": "Открыть PR",
         "post_btn": "Читать пост",
         "invite_btn": "Присоединиться",
-        "invite_offer": "Тебя пригласили в {name}. {hours} часов, чтобы принять.",
+        "invite_offer": "Я отправил тебе инвайт в нашу команду.",
         "connect_offer": "Привяжи Telegram к Viewfy, чтобы продолжить.",
         "thread_btn": "Открыть тред",
         "open_btn": "Открыть",
-        "approve_btn": "Approve",
-        "reject_btn": "Reject",
+        "reply_x_btn": "Ответить в X",
+        "operator_post_btn": "Опубликовать",
+        "approve_btn": "В очередь",
+        "reject_btn": "Пропустить",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (
-            "Не удалось создать ссылку сейчас. "
-            "Попробуй ещё раз через минуту. ({err})"
+            "Не удалось создать ссылку. Попробуй ещё раз через минуту."
         ),
         "not_linked": (
             "Telegram ещё не привязан к Viewfy.\n\n"

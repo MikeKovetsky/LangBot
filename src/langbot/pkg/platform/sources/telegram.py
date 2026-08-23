@@ -72,11 +72,16 @@ def vf_decision_edit_kwargs(message, decision: str) -> dict:
     (fenced draft + bold) into raw backticks. Offsets stay valid because we
     only append after the existing text.
     """
-    mark = '✅' if decision == 'approve' else '✕'
+    # Approve only queues: no server sender exists for community replies, the
+    # founder (extension) or the operator posts. The stamp must not imply "sent".
+    if decision == 'approve':
+        stamp = '✅ Queued — the operator posts it'
+    else:
+        stamp = '✕ Skipped'
     original = (getattr(message, 'text', None) or '') if message is not None else ''
     entities = list(getattr(message, 'entities', None) or [])
     kwargs: dict = {
-        'text': f'{original}\n\n{mark} {decision.capitalize()}',
+        'text': f'{original}\n\n{stamp}',
         'reply_markup': None,
     }
     if entities:
