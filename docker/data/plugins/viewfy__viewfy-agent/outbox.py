@@ -260,21 +260,18 @@ def _build_markup(
     target_url = (payload.get("target_url") or "").strip()
     action_id = (payload.get("action_id") or "").strip()
     if payload.get("needs_approval"):
-        # Two buttons self-serve (the founder is the poster), three on the
-        # automation rungs (operator=True: Post commands the operator queue).
-        # X gets the reply intent — composer opens with the draft prefilled,
-        # threaded to the tweet, so posting is one tap instead of copy+paste.
+        # Two buttons self-serve (the founder is the poster: on X the reply
+        # intent opens the composer with the draft prefilled), three on the
+        # automation rungs — Open thread / Post / Skip, where Post commands
+        # the operator queue. Never both blue rows: three buttons max.
         primary = None
-        intent = _x_reply_intent(payload)
+        intent = "" if payload.get("operator") else _x_reply_intent(payload)
         if intent:
             primary = cta.url_btn(i18n.t(lang, "reply_x_btn"), intent)
         elif target_url.startswith("https://") and target_url != button_url:
             primary = cta.url_btn(i18n.t(lang, "thread_btn"), target_url)
         if primary is not None:
             rows.append([primary])
-        if intent and target_url.startswith("https://") and payload.get("operator"):
-            # Operators read the room before posting; keep the raw thread too.
-            rows.append([cta.url_btn(i18n.t(lang, "thread_btn"), target_url)])
         if action_id:
             decide = []
             if payload.get("operator"):
