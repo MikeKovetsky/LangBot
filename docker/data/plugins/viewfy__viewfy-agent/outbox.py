@@ -101,6 +101,9 @@ Rules:
   (a button is attached). Mention repo or PR number lightly if useful.
 - If kind is blog_published / outcome published: the post the founder asked for is live on
   their blog. Name the title, one line. Do not paste the URL (a button is attached).
+- If kind is blog_published / outcome draft: a blog post is written and waiting. Name the
+  title, one line. Do not say it is live. Do not paste the URL (View / Approve / Reject
+  buttons are attached). Do not say "reply approve or reject".
 - If kind is daily_digest / outcome morning: this is the morning report. Open like
   "morning. here is {day}, while you were shipping." then short lines for each non-empty
   section (visitors, signups, citations, post, ads total, link building, sales, scout).
@@ -228,6 +231,22 @@ def _scrub_dashes(text: str) -> str:
     )
 
 
+def _blog_approval_row(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
+    """Exactly one row: View, Approve, Reject. Nothing else."""
+    import cta
+    import i18n
+
+    action_id = (payload.get("action_id") or "").strip()
+    view = (payload.get("button_url") or payload.get("target_url") or "").strip()
+    if not action_id or not view.startswith("https://"):
+        return None
+    return cta.keyboard([[
+        cta.url_btn(i18n.t(lang, "view_btn"), view),
+        cta.cb_btn(i18n.t(lang, "blog_approve_btn"), f"vf:approve:{action_id}", style="primary"),
+        cta.cb_btn(i18n.t(lang, "blog_reject_btn"), f"vf:reject:{action_id}", style="danger"),
+    ]])
+
+
 def _build_markup(
     payload: dict[str, Any],
     lang: str,
@@ -236,6 +255,11 @@ def _build_markup(
 ) -> dict[str, Any] | None:
     import cta
     import i18n
+
+    if payload.get("needs_approval") and (
+        kind == "blog_published" or payload.get("approve_with") == "blog"
+    ):
+        return _blog_approval_row(payload, lang)
 
     rows: list[list[dict[str, Any]]] = []
 
@@ -260,7 +284,7 @@ def _build_markup(
     target_url = (payload.get("target_url") or "").strip()
     action_id = (payload.get("action_id") or "").strip()
     if payload.get("needs_approval"):
-        # One honest set for every plan: Copy draft + Open thread + Skip.
+        # Scout: Copy draft + Open thread + Skip.
         # A draft card only exists when the channel's autopost is off, so no
         # button may read as the bot posting. Copy is omitted only when the
         # draft exceeds Telegram's 256-char copy_text cap (the fenced block

@@ -447,7 +447,7 @@ class TelegramAdapter(abstract_platform_adapter.AbstractMessagePlatformAdapter):
             try:
                 raw = (query.data or '').strip()
                 # Viewfy inline CTAs:
-                #   vf:approve:<uuid> / vf:reject:<uuid> — scout draft decisions
+                #   vf:approve:<uuid> / vf:reject:<uuid> — scout or blog draft decisions
                 #   vf:queue:<product_uuid> — morning digest → unified approvals
                 if (
                     raw.startswith('vf:approve:')

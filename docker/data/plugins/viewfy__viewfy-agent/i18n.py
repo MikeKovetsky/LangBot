@@ -87,7 +87,7 @@ def resolve_lang(
 
 def t(lang: Lang, key: str) -> str:
     table = STRINGS.get(lang) or STRINGS["en"]
-    return table.get(key) or STRINGS["en"][key]
+    return table.get(key) or STRINGS["en"].get(key) or key
 
 
 def warm(lang: Lang) -> str:
@@ -166,6 +166,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "connect_cf_inbox_btn": "Connect Cloudflare for inbox",
         "pr_btn": "Open PR",
         "post_btn": "Read the post",
+        "view_btn": "View",
         "invite_btn": "Join",
         "invite_offer": "I sent you an invite to our team.",
         "connect_offer": "Link Telegram to Viewfy to continue.",
@@ -174,6 +175,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "copy_btn": "Copy draft",
         "approve_btn": "Queue it",
         "reject_btn": "Skip",
+        "blog_approve_btn": "Approve",
+        "blog_reject_btn": "Reject",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
@@ -209,6 +212,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "connect_cf_inbox_btn": "Cloudflare для inbox",
         "pr_btn": "Відкрити PR",
         "post_btn": "Читати пост",
+        "view_btn": "Відкрити",
         "invite_btn": "Приєднатись",
         "invite_offer": "Я вислав тобі інвайт в нашу команду.",
         "connect_offer": "Привʼяжи Telegram до Viewfy, щоб продовжити.",
@@ -217,6 +221,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "copy_btn": "Скопіювати",
         "approve_btn": "В чергу",
         "reject_btn": "Пропустити",
+        "blog_approve_btn": "Підтвердити",
+        "blog_reject_btn": "Відхилити",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
@@ -252,6 +258,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "connect_cf_inbox_btn": "Cloudflare для inbox",
         "pr_btn": "Открыть PR",
         "post_btn": "Читать пост",
+        "view_btn": "Открыть",
         "invite_btn": "Присоединиться",
         "invite_offer": "Я отправил тебе инвайт в нашу команду.",
         "connect_offer": "Привяжи Telegram к Viewfy, чтобы продолжить.",
@@ -260,6 +267,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "copy_btn": "Скопировать",
         "approve_btn": "В очередь",
         "reject_btn": "Пропустить",
+        "blog_approve_btn": "Подтвердить",
+        "blog_reject_btn": "Отклонить",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (

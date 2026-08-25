@@ -71,6 +71,10 @@ async def rewrite_offer(
     model = (plugin.llm_model_uuid or "").strip()
     if not model:
         return _with_url(_fallback(kind, facts, lang_n), url)
+    # Invite copy is a one-line CTA. LLM rewrite turned it into a vague
+    # "invitation valid 2 days" plus the group wake rules.
+    if kind == "product_invite":
+        return _with_url(_fallback(kind, facts, lang_n), url)
 
     system = OFFER_SYSTEM
     if lang_n != "en":
@@ -124,12 +128,9 @@ def _strip_think(text: str) -> str:
 
 
 def _wake(text: str, kind: str, lang: str) -> str:
-    """Group invitees don't know the wake rules; say them verbatim, never rewritten."""
-    import i18n
-
-    if kind != "product_invite":
-        return text
-    return f"{text}\n\n{i18n.wake_hint(lang)}"
+    """Do not append group wake rules on the join-team invite."""
+    _ = kind, lang
+    return text
 
 
 def _with_url(text: str, url: str) -> str:
