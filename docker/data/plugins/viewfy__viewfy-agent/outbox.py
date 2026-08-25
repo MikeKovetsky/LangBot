@@ -284,23 +284,22 @@ def _build_markup(
     target_url = (payload.get("target_url") or "").strip()
     action_id = (payload.get("action_id") or "").strip()
     if payload.get("needs_approval"):
-        # Scout: Copy draft + Open thread + Skip.
-        # A draft card only exists when the channel's autopost is off, so no
-        # button may read as the bot posting. Copy is omitted only when the
-        # draft exceeds Telegram's 256-char copy_text cap (the fenced block
-        # in the message body stays tap-to-copy there).
-        top = []
+        # Scout: one row — Skip, Copy, Open thread. Autopost is off on these
+        # cards, so no button may read as the bot posting. copy_text caps at
+        # 256; longer drafts still get the button (first 256) and the fenced
+        # body stays tap-to-copy for the rest.
+        row: list[dict[str, Any]] = []
         draft = (payload.get("draft_text") or "").strip()
-        if draft and len(draft) <= 256:
-            top.append(cta.copy_btn(i18n.t(lang, "copy_btn"), draft))
-        if target_url.startswith("https://") and target_url != button_url:
-            top.append(cta.url_btn(i18n.t(lang, "thread_btn"), target_url))
-        if top:
-            rows.append(top)
         if action_id:
-            rows.append([
+            row.append(
                 cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"),
-            ])
+            )
+        if draft:
+            row.append(cta.copy_btn(i18n.t(lang, "copy_btn"), draft))
+        if target_url.startswith("https://") and target_url != button_url:
+            row.append(cta.url_btn(i18n.t(lang, "thread_btn"), target_url))
+        if row:
+            rows.append(row)
 
     return cta.keyboard(rows) if rows else None
 
