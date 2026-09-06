@@ -305,6 +305,9 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
             except Exception:
                 pin = {}
             if pin.get("pinned"):
+                if not await plugin.claim_product_invite_send(tg_id, chat_id):
+                    # Already sent Join once — let the LLM answer instead of flooding.
+                    return
                 event_context.prevent_default()
                 event_context.prevent_postorder()
                 url = None
@@ -315,6 +318,7 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
                         lang=lang,
                     )
                 except Exception as e:
+                    plugin._invite_unclaim(tg_id, chat_id)
                     log.exception("product invite offer failed")
                     reply = i18n.prepare_fail(lang, str(e))
                 sent = await plugin.send_connect_message(

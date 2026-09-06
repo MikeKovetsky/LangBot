@@ -157,6 +157,8 @@ async def mint_product_invite_facts(
             "telegram_chat_id": str(telegram_chat_id),
         },
     )
+    if out.get("_http_status") == 409:
+        raise RuntimeError("invite already offered")
     if out.get("_http_status") or not out.get("url"):
         raise RuntimeError(out.get("detail") or "product_invite mint failed")
     return {

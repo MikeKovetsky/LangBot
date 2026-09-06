@@ -84,6 +84,8 @@ class ViewfyAgentPlugin(BasePlugin):
         self._typing_tasks: dict[str, asyncio.Task] = {}
         self._turn: dict[str, dict[str, Any]] = {}  # chat_id -> side-effect gate state
         self._anchor: dict[str, tuple[float, list[dict[str, Any]]]] = {}  # tg_id -> (deadline, products)
+        self._invite_sent: set[tuple[str, str]] = set()
+        self._invite_locks: dict[tuple[str, str], asyncio.Lock] = {}
         self._outbox_task: asyncio.Task | None = None
         if self.bot_token and self.sticker_set:
             await self._load_stickers()
@@ -414,6 +416,56 @@ class ViewfyAgentPlugin(BasePlugin):
         text = await diegetic.rewrite_offer(self, kind="connect_offer", facts=facts, lang=lang_n)
         return text, str(facts["url"])
 
+    def _invite_key(self, telegram_user_id: str, telegram_chat_id: str) -> tuple[str, str]:
+        return (str(telegram_user_id), str(telegram_chat_id or "").split("#", 1)[0])
+
+    def _invite_unclaim(self, telegram_user_id: str, telegram_chat_id: str) -> None:
+        sent = getattr(self, "_invite_sent", None)
+        if sent is not None:
+            sent.discard(self._invite_key(telegram_user_id, telegram_chat_id))
+
+    async def _invite_in_messages(self, telegram_user_id: str, telegram_chat_id: str) -> bool:
+        chat = str(telegram_chat_id or "").split("#", 1)[0]
+        try:
+            out = await self._request(
+                "GET",
+                "/api/telegram/agent/messages",
+                query={"telegram_chat_id": chat, "limit": "50"},
+            )
+        except Exception:
+            return False
+        if out.get("_http_status"):
+            return False
+        for row in out.get("items") or []:
+            if str(row.get("telegram_user_id") or "") != str(telegram_user_id):
+                continue
+            if (row.get("direction") or "") != "out":
+                continue
+            if (row.get("meta") or {}).get("kind") == "product_invite":
+                return True
+        return False
+
+    async def claim_product_invite_send(
+        self, telegram_user_id: str, telegram_chat_id: str
+    ) -> bool:
+        """First caller for this speaker+chat sends the Join button; later callers skip."""
+        if not hasattr(self, "_invite_sent"):
+            self._invite_sent = set()
+        if not hasattr(self, "_invite_locks"):
+            self._invite_locks = {}
+        key = self._invite_key(telegram_user_id, telegram_chat_id)
+        if key in self._invite_sent:
+            return False
+        lock = self._invite_locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            if key in self._invite_sent:
+                return False
+            if await self._invite_in_messages(telegram_user_id, telegram_chat_id):
+                self._invite_sent.add(key)
+                return False
+            self._invite_sent.add(key)
+            return True
+
     async def offer_product_invite(
         self,
         *,
@@ -606,6 +658,17 @@ class ViewfyAgentPlugin(BasePlugin):
                 except Exception:
                     pin = {}
                 if pin.get("pinned"):
+                    if not await self.claim_product_invite_send(telegram_user_id, chat):
+                        return json.dumps(
+                            {
+                                "summary": (
+                                    "Join-product button already sent. "
+                                    "Do not send another or paste the URL."
+                                ),
+                                "data": {"button_sent": True, "already": True},
+                            },
+                            ensure_ascii=False,
+                        )
                     try:
                         text, url = await self.offer_product_invite(
                             telegram_user_id=telegram_user_id,
@@ -624,6 +687,7 @@ class ViewfyAgentPlugin(BasePlugin):
                             ensure_ascii=False,
                         )
                     except Exception as e:
+                        self._invite_unclaim(telegram_user_id, chat)
                         log.warning("product invite offer failed: %s", e)
             try:
                 text, url = await self.offer_connect(telegram_user_id=telegram_user_id, lang=lang)

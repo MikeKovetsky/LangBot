@@ -22,3 +22,5 @@ docker/data/storage
 docker/data/box
 docker/data/plugins/viewfy_agent/settings.json
 docker/data/plugins/viewfy_agent/data
+docker/data/plugins/viewfy__viewfy-agent/settings.json
+docker/data/plugins/viewfy__viewfy-agent/data
