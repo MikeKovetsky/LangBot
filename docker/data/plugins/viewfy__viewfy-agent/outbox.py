@@ -104,6 +104,9 @@ Rules:
 - If kind is blog_published / outcome draft: a blog post is written and waiting. Name the
   title, one line. Do not say it is live. Do not paste the URL (View / Approve / Reject
   buttons are attached). Do not say "reply approve or reject".
+- If kind is link_report / outcome draft: a link-building pitch is waiting. Name the
+  product and the target domain. Say email or form paste from lane. Do not paste the
+  pitch (Approve / Skip buttons are attached). Do not say it already went out.
 - If kind is daily_digest / outcome morning: this is the morning report. Open like
   "morning. here is {day}, while you were shipping." then short lines for each non-empty
   section (visitors, signups, citations, post, ads total, link building, sales, scout).
@@ -231,6 +234,27 @@ def _scrub_dashes(text: str) -> str:
     )
 
 
+def _link_approval_row(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
+    """Approve sends the pitch; Skip parks it. Copy + open the site."""
+    import cta
+    import i18n
+
+    action_id = (payload.get("action_id") or "").strip()
+    if not action_id:
+        return None
+    row: list[dict[str, Any]] = [
+        cta.cb_btn(i18n.t(lang, "link_approve_btn"), f"vf:approve:{action_id}", style="primary"),
+        cta.cb_btn(i18n.t(lang, "reject_btn"), f"vf:reject:{action_id}", style="danger"),
+    ]
+    draft = (payload.get("draft_text") or "").strip()
+    if draft:
+        row.append(cta.copy_btn(i18n.t(lang, "copy_btn"), draft))
+    site = (payload.get("target_url") or "").strip()
+    if site.startswith("https://"):
+        row.append(cta.url_btn(i18n.t(lang, "link_open_btn"), site))
+    return cta.keyboard([row])
+
+
 def _blog_approval_row(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
     """Exactly one row: View, Approve, Reject. Nothing else."""
     import cta
@@ -255,6 +279,11 @@ def _build_markup(
 ) -> dict[str, Any] | None:
     import cta
     import i18n
+
+    if payload.get("needs_approval") and (
+        kind == "link_report" or payload.get("approve_with") == "links"
+    ):
+        return _link_approval_row(payload, lang)
 
     if payload.get("needs_approval") and (
         kind == "blog_published" or payload.get("approve_with") == "blog"

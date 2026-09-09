@@ -6,15 +6,16 @@ metadata:
     en_US: scout_approve
     zh_Hans: scout_approve
   description:
-    en_US: "Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it; decision=edit replaces this one draft's text (status stays draft) and needs draft_text: the full replacement, in the founder's words or your rewrite of this draft. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
-    zh_Hans: "Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue (or from a prior tool result). decision=approve queues it for posting; decision=reject closes it; decision=edit replaces this one draft's text (status stays draft) and needs draft_text: the full replacement, in the founder's words or your rewrite of this draft. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
+    en_US: "Approve, reject, skip, or edit a pending scout draft, blog draft, or link-building pitch. Pass action_id from scout_queue, a Telegram button, or a prior tool result. decision=approve queues a scout reply, publishes a blog post, or sends a link pitch; decision=reject/skip closes it; decision=edit replaces this one scout draft's text (status stays draft) and needs draft_text. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
+    zh_Hans: "Approve, reject, skip, or edit a pending scout draft, blog draft, or link-building pitch. Pass action_id from scout_queue, a Telegram button, or a prior tool result. decision=approve queues a scout reply, publishes a blog post, or sends a link pitch; decision=reject/skip closes it; decision=edit replaces this one scout draft's text (status stays draft) and needs draft_text. That does not change the standing brief; use scout action=revise for future drafts. Never invent an action_id."
 spec:
   parameters: {"type": "object", "properties": {"action_id": {"type": "string", "description": "Roam action id from scout_queue."}, "decision": {"type": "string", "enum": ["approve", "reject", "edit"], "default": "approve"}, "draft_text": {"type": "string", "description": "Required for decision=edit. Full replacement body for this one waiting draft. Does not change the standing channel brief."}}, "required": ["action_id"], "additionalProperties": false}
   llm_prompt: >-
-    Approve, reject, or edit a pending scout draft. Pass action_id from scout_queue. Never
-    invent ids. Never show action ids in chat. decision=edit needs the full replacement
-    draft_text for this one waiting draft; it does not change the standing brief (that is scout
-    action=revise).
+    Approve, reject/skip, or edit a pending scout draft, blog draft, or link-building pitch.
+    Pass action_id from scout_queue or a Telegram button. Never invent ids. Never show action
+    ids in chat. Approve on a link pitch sends the email (or records a form submit); skip
+    parks it. decision=edit needs the full replacement draft_text for this one waiting scout
+    draft; it does not change the standing brief (that is scout action=revise).
 execution:
   python:
     path: scout_approve.py

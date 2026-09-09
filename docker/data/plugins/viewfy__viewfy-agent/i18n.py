@@ -177,6 +177,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "reject_btn": "Skip",
         "blog_approve_btn": "Approve",
         "blog_reject_btn": "Reject",
+        "link_approve_btn": "Approve",
+        "link_open_btn": "Open site",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
@@ -223,6 +225,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "reject_btn": "Пропустити",
         "blog_approve_btn": "Підтвердити",
         "blog_reject_btn": "Відхилити",
+        "link_approve_btn": "Підтвердити",
+        "link_open_btn": "Відкрити сайт",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
@@ -269,6 +273,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "reject_btn": "Пропустить",
         "blog_approve_btn": "Подтвердить",
         "blog_reject_btn": "Отклонить",
+        "link_approve_btn": "Подтвердить",
+        "link_open_btn": "Открыть сайт",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (
