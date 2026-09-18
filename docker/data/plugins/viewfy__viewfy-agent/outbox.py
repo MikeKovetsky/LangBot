@@ -249,8 +249,18 @@ def link_quote_text(payload: dict[str, Any], lang: str) -> str:
     if price is None:
         price = payload.get("customer_price_usd")
     dr = payload.get("dr")
+    pct = payload.get("cheaper_pct")
+    cheaper_market = (payload.get("cheaper_market") or "").strip()
     facts = " · ".join(
-        f for f in (f"DR {dr}" if dr is not None else "", f"${price}" if price is not None else "") if f
+        f
+        for f in (
+            f"DR {dr}" if dr is not None else "",
+            f"${price}" if price is not None else "",
+            i18n.t(lang, "link_quote_cheaper").format(pct=pct, market=cheaper_market)
+            if pct and cheaper_market
+            else "",
+        )
+        if f
     )
     head = i18n.t(lang, "link_quote_head").format(domain=domain, product=product)
     # The rail: the publisher direct, or the marketplace whose listing came in

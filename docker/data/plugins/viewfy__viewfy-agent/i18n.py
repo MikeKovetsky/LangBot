@@ -183,6 +183,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_head": "{domain} for {product}",
         "link_quote_direct": "The publisher's price. Approve orders it.",
         "link_quote_market": "Listed on {market} for less than direct. Approve orders it.",
+        "link_quote_cheaper": "{pct}% cheaper than on {market}",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
@@ -234,6 +235,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_head": "{domain} для {product}",
         "link_quote_direct": "Ціна від видавця. Підтвердити = замовити.",
         "link_quote_market": "Через {market}: дешевше, ніж напряму. Підтвердити = замовити.",
+        "link_quote_cheaper": "на {pct}% дешевше, ніж на {market}",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
@@ -285,6 +287,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_head": "{domain} для {product}",
         "link_quote_direct": "Цена от издателя. Подтвердить = заказать.",
         "link_quote_market": "Через {market}: дешевле, чем напрямую. Подтвердить = заказать.",
+        "link_quote_cheaper": "на {pct}% дешевле, чем на {market}",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (
