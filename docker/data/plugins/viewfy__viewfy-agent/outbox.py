@@ -234,8 +234,37 @@ def _scrub_dashes(text: str) -> str:
     )
 
 
+def link_quote_text(payload: dict[str, Any], lang: str) -> str:
+    """The link quote card, verbatim from facts: domain, DR, price.
+
+    No model rewrite. The rewriter dropped the price, once read our fee as the
+    price, and once spelled out the whole breakdown into a chat the customer
+    can sit in. The dashboard card behind See details holds the rest.
+    """
+    import i18n
+
+    domain = (payload.get("domain") or payload.get("target_title") or "").strip()
+    product = (payload.get("product_name") or "").strip()
+    price = payload.get("price_usd")
+    if price is None:
+        price = payload.get("customer_price_usd")
+    dr = payload.get("dr")
+    facts = " · ".join(
+        f for f in (f"DR {dr}" if dr is not None else "", f"${price}" if price is not None else "") if f
+    )
+    head = i18n.t(lang, "link_quote_head").format(domain=domain, product=product)
+    # The rail: the publisher direct, or the marketplace whose listing came in
+    # under what they asked (then ops orders it there).
+    market = (payload.get("market") or "").strip()
+    if payload.get("rail") == "market" and market:
+        tail = i18n.t(lang, "link_quote_market").format(market=market)
+    else:
+        tail = i18n.t(lang, "link_quote_direct")
+    return "\n".join(p for p in (head, facts, tail) if p.strip())
+
+
 def _link_approval_row(payload: dict[str, Any], lang: str) -> dict[str, Any] | None:
-    """Approve sends the pitch; Skip parks it. Copy + open the site."""
+    """Approve orders the quote; Skip parks it; See details opens its dashboard card."""
     import cta
     import i18n
 
@@ -249,9 +278,9 @@ def _link_approval_row(payload: dict[str, Any], lang: str) -> dict[str, Any] | N
     draft = (payload.get("draft_text") or "").strip()
     if draft:
         row.append(cta.copy_btn(i18n.t(lang, "copy_btn"), draft))
-    site = (payload.get("target_url") or "").strip()
-    if site.startswith("https://"):
-        row.append(cta.url_btn(i18n.t(lang, "link_open_btn"), site))
+    details = (payload.get("button_url") or "").strip()
+    if details.startswith("https://"):
+        row.append(cta.url_btn(i18n.t(lang, "details_btn"), details))
     return cta.keyboard([row])
 
 
@@ -342,16 +371,18 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
     tg_uid = str(item["telegram_user_id"])
     chat_id = str(item.get("telegram_chat_id") or tg_uid)
     lang = plugin.lang_for(tg_uid)
-    intro = await rewrite(plugin, kind, payload, lang=lang)
-
-    if (
-        kind != "daily_digest"
-        and payload.get("needs_approval")
-        and (payload.get("draft_text") or "").strip()
-    ):
-        text = _compose_approval(intro, payload)
+    if kind == "link_report" and payload.get("outcome") == "quoted":
+        text = link_quote_text(payload, lang)
     else:
-        text = intro
+        intro = await rewrite(plugin, kind, payload, lang=lang)
+        if (
+            kind != "daily_digest"
+            and payload.get("needs_approval")
+            and (payload.get("draft_text") or "").strip()
+        ):
+            text = _compose_approval(intro, payload)
+        else:
+            text = intro
 
     # New members don't know the group wake rules; state them verbatim once.
     if kind == "product_invite_accepted" and chat_id.startswith("-"):

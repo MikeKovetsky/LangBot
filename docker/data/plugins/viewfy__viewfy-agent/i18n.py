@@ -178,7 +178,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "blog_approve_btn": "Approve",
         "blog_reject_btn": "Reject",
         "link_approve_btn": "Approve",
-        "link_open_btn": "Open site",
+        "details_btn": "See details",
+        # Link quote card: facts only, no rewrite. {facts} is "DR 63 · $98".
+        "link_quote_head": "{domain} for {product}",
+        "link_quote_direct": "The publisher's price. Approve orders it.",
+        "link_quote_market": "Listed on {market} for less than direct. Approve orders it.",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
@@ -226,7 +230,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "blog_approve_btn": "Підтвердити",
         "blog_reject_btn": "Відхилити",
         "link_approve_btn": "Підтвердити",
-        "link_open_btn": "Відкрити сайт",
+        "details_btn": "Детальніше",
+        "link_quote_head": "{domain} для {product}",
+        "link_quote_direct": "Ціна від видавця. Підтвердити = замовити.",
+        "link_quote_market": "Через {market}: дешевше, ніж напряму. Підтвердити = замовити.",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
@@ -274,7 +281,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "blog_approve_btn": "Подтвердить",
         "blog_reject_btn": "Отклонить",
         "link_approve_btn": "Подтвердить",
-        "link_open_btn": "Открыть сайт",
+        "details_btn": "Подробнее",
+        "link_quote_head": "{domain} для {product}",
+        "link_quote_direct": "Цена от издателя. Подтвердить = заказать.",
+        "link_quote_market": "Через {market}: дешевле, чем напрямую. Подтвердить = заказать.",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (
