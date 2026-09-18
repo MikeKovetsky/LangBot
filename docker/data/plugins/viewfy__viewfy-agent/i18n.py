@@ -184,6 +184,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_direct": "The publisher's price. Approve orders it.",
         "link_quote_market": "Listed on {market} for less than direct. Approve orders it.",
         "link_quote_cheaper": "{pct}% cheaper than on {market}",
+        "link_state_ordered": "Ordered ✓ · Viewfy is placing it.",
+        "link_state_skipped": "Skipped ✕",
+        "link_state_paid": "Paid ✓ · waiting for the article to go live.",
+        "link_state_live": "Live ✓",
         "review_drafts_btn": "Review drafts",
         "tap_below": "👇",
         "prepare_fail": (
@@ -236,6 +240,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_direct": "Ціна від видавця. Підтвердити = замовити.",
         "link_quote_market": "Через {market}: дешевше, ніж напряму. Підтвердити = замовити.",
         "link_quote_cheaper": "на {pct}% дешевше, ніж на {market}",
+        "link_state_ordered": "Замовлено ✓ · Viewfy розміщує.",
+        "link_state_skipped": "Пропущено ✕",
+        "link_state_paid": "Оплачено ✓ · чекаємо публікацію.",
+        "link_state_live": "Опубліковано ✓",
         "review_drafts_btn": "Переглянути драфти",
         "tap_below": "👇",
         "prepare_fail": (
@@ -288,6 +296,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_quote_direct": "Цена от издателя. Подтвердить = заказать.",
         "link_quote_market": "Через {market}: дешевле, чем напрямую. Подтвердить = заказать.",
         "link_quote_cheaper": "на {pct}% дешевле, чем на {market}",
+        "link_state_ordered": "Заказано ✓ · Viewfy размещает.",
+        "link_state_skipped": "Пропущено ✕",
+        "link_state_paid": "Оплачено ✓ · ждём публикацию.",
+        "link_state_live": "Опубликовано ✓",
         "review_drafts_btn": "Посмотреть драфты",
         "tap_below": "👇",
         "prepare_fail": (

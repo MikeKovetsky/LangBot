@@ -33,13 +33,24 @@ class GroupGone(RuntimeError):
     """Bot cannot send to this group; pin should be dropped."""
 
 
+# Telegram's answers when the message we want to edit is no longer there.
+_EDIT_GONE = ("message to edit not found", "message can't be edited", "message_id_invalid")
+
+
 async def _send_formatted(
     plugin: ViewfyAgentPlugin,
     chat_id: str,
     body_text: str,
     markup: dict[str, Any] | None,
-) -> bool:
-    """MarkdownV2 (markdown_card) → HTML → plain. Always the same chat."""
+    *,
+    edit_of: dict[str, Any] | None = None,
+) -> int | None:
+    """MarkdownV2 (markdown_card) → HTML → plain. Always the same chat.
+
+    Returns the Telegram message id, or None when nothing went out. With
+    `edit_of` the existing card is rewritten in place; a card the founder
+    deleted falls back to a fresh send.
+    """
     import cta
 
     attempts: list[tuple[str | None, str]] = [
@@ -47,6 +58,7 @@ async def _send_formatted(
         ("HTML", cta.html_from_markdownish(body_text)[:4000]),
         (None, body_text[:4000]),
     ]
+    method = "editMessageText" if edit_of else "sendMessage"
     last_desc: str | None = None
     for parse_mode, payload in attempts:
         body: dict[str, Any] = {
@@ -55,18 +67,28 @@ async def _send_formatted(
             "disable_web_page_preview": True,
             "link_preview_options": {"is_disabled": True},
         }
+        if edit_of:
+            body["message_id"] = edit_of.get("message_id")
         if parse_mode:
             body["parse_mode"] = parse_mode
         if markup:
             body["reply_markup"] = markup
-        out = await plugin._tg("sendMessage", body)
+        out = await plugin._tg(method, body)
         if out.get("ok"):
-            return True
+            result = out.get("result") if isinstance(out.get("result"), dict) else {}
+            mid = result.get("message_id", edit_of.get("message_id") if edit_of else None)
+            return int(mid) if mid is not None else None
         last_desc = str(out.get("description") or "")
-        log.warning("outbox %s send failed: %s", parse_mode or "plain", last_desc)
+        low = last_desc.lower()
+        if edit_of and "message is not modified" in low:
+            return int(edit_of.get("message_id"))
+        if edit_of and any(s in low for s in _EDIT_GONE):
+            log.info("outbox card %s gone from chat %s, sending fresh", edit_of.get("message_id"), chat_id)
+            return await _send_formatted(plugin, chat_id, body_text, markup)
+        log.warning("outbox %s %s failed: %s", method, parse_mode or "plain", last_desc)
         if _group_gone(chat_id, last_desc):
             raise GroupGone(last_desc or "bot left group")
-    return False
+    return None
 
 
 def _group_gone(chat_id: str, description: str | None) -> bool:
@@ -263,10 +285,15 @@ def link_quote_text(payload: dict[str, Any], lang: str) -> str:
         if f
     )
     head = i18n.t(lang, "link_quote_head").format(domain=domain, product=product)
-    # The rail: the publisher direct, or the marketplace whose listing came in
-    # under what they asked (then ops orders it there).
+    state = (payload.get("state") or "").strip()
     market = (payload.get("market") or "").strip()
-    if payload.get("rail") == "market" and market:
+    if state:
+        # The row moved on (ordered, skipped, paid, live): the card says so
+        # instead of asking for a decision.
+        tail = i18n.t(lang, f"link_state_{state}")
+    elif payload.get("rail") == "market" and market:
+        # The marketplace whose listing came in under what they asked (then
+        # ops orders it there).
         tail = i18n.t(lang, "link_quote_market").format(market=market)
     else:
         tail = i18n.t(lang, "link_quote_direct")
@@ -405,7 +432,10 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
 
     # Bot API first so we can attach buttons. MarkdownV2 matches LangBot markdown_card;
     # HTML then plain+markup stay on the same chat if Telegram rejects the parse mode.
+    # A payload with edit_of rewrites the card already in the chat.
+    edit_of = payload.get("edit_of") if isinstance(payload.get("edit_of"), dict) else None
     sent = False
+    message_id: int | None = None
     chat = chat_id.split("#", 1)[0]
     if getattr(plugin, "bot_token", None):
         body_text = text
@@ -413,7 +443,8 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
             "url" in b for row in markup.get("inline_keyboard", []) for b in row
         ):
             body_text = cta.strip_urls(text) or text
-        sent = await _send_formatted(plugin, chat, body_text, markup)
+        message_id = await _send_formatted(plugin, chat, body_text, markup, edit_of=edit_of)
+        sent = message_id is not None
         if not sent:
             log.warning("outbox formatted send failed chat=%s", chat)
 
@@ -432,24 +463,26 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
             message_chain=chain,
         )
 
-    await plugin.ingest(
-        telegram_user_id=tg_uid,
-        telegram_chat_id=chat,
-        direction="out",
-        text=text,
-        meta={
-            "kind": kind,
-            "outbox_id": str(item.get("id")),
-            "via": "langbot_outbox",
-            "action_id": payload.get("action_id"),
-            "needs_approval": bool(payload.get("needs_approval")),
-            "has_buttons": bool(markup),
-        },
-    )
-    return text
+    if not edit_of:
+        await plugin.ingest(
+            telegram_user_id=tg_uid,
+            telegram_chat_id=chat,
+            direction="out",
+            text=text,
+            telegram_message_id=str(message_id) if message_id is not None else None,
+            meta={
+                "kind": kind,
+                "outbox_id": str(item.get("id")),
+                "via": "langbot_outbox",
+                "action_id": payload.get("action_id"),
+                "needs_approval": bool(payload.get("needs_approval")),
+                "has_buttons": bool(markup),
+            },
+        )
+    return text, message_id, chat
 
 
-async def _deliver_with_retries(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
+async def _deliver_with_retries(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> tuple[str, int | None, str]:
     attempts = 1 + DELIVER_RETRIES
     last: Exception | None = None
     for i in range(attempts):
@@ -483,11 +516,11 @@ async def poll_once(plugin: ViewfyAgentPlugin) -> int:
     for item in items:
         item_id = item.get("id")
         try:
-            text = await _deliver_with_retries(plugin, item)
+            text, message_id, chat = await _deliver_with_retries(plugin, item)
             await plugin._request(
                 "POST",
                 f"/api/telegram/agent/outbox/{item_id}/ack",
-                body={"status": "sent", "text": text},
+                body={"status": "sent", "text": text, "message_id": message_id, "chat_id": chat},
             )
             done += 1
         except Exception as e:
