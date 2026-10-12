@@ -60,3 +60,42 @@ def test_deliver_uses_the_payload_language(monkeypatch):
     except Exception:
         pass
     assert seen["lang"] == "ru"
+
+
+def test_marketer_voice_drops_founder_slang():
+    import voice
+
+    founder = outbox.rewrite_system(None)
+    assert "young YC founder" in founder and "while you were shipping" in founder
+    assert "go build" in founder
+
+    seo = outbox.rewrite_system("marketer")
+    assert "head of SEO" in seo
+    assert "while you were shipping" not in seo and "close with go build" not in seo
+    assert "<MORNING>" not in seo and "<WEEKLY>" not in seo and "<CLOSE>" not in seo
+    assert outbox.rewrite_system("nonsense") == founder
+
+    assert voice.chat_line("marketer", "DMarket").startswith("READER: this group belongs to DMarket")
+    assert voice.chat_line(None, "DMarket") == ""
+
+
+def test_voice_is_not_a_fact_to_paraphrase():
+    msg = outbox._facts_user_message("daily_digest", {"outcome": "morning", "voice": "marketer"}, "en")
+    assert "marketer" not in msg
+
+
+def test_deliver_rewrites_in_the_payload_voice(monkeypatch):
+    seen = {}
+
+    async def invoke_llm(*, llm_model_uuid, messages, extra_args):
+        seen["system"] = messages[0].content
+        return SimpleNamespace(content="ok")
+
+    plugin = SimpleNamespace(llm_model_uuid="m", invoke_llm=invoke_llm)
+    try:
+        asyncio.run(outbox.rewrite(plugin, "daily_digest", {"outcome": "morning", "voice": "marketer"}))
+    except ModuleNotFoundError:
+        import pytest
+
+        pytest.skip("langbot_plugin is not installed here")
+    assert "head of SEO" in seen["system"]

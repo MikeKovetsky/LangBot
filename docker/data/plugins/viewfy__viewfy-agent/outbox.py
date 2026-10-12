@@ -97,12 +97,8 @@ def _group_gone(chat_id: str, description: str | None) -> bool:
     hay = (description or "").lower()
     return any(s in hay for s in _GROUP_GONE)
 
-REWRITE_SYSTEM = """You are Viewfy, chatting with a young YC founder over Telegram.
-
-Voice: peer founder, not coach or corporate SaaS. Short, direct, slightly sharp.
-Casual but not cringe. No hype adjectives. No LinkedIn energy.
-
-You are rewriting an INTERNAL event into a chat update for the founder.
+# The persona and the report's opening and close come from voice.py, per reader.
+REWRITE_RULES = """You are rewriting an INTERNAL event into a chat update for the reader.
 Rules:
 - First line is what happened. No preamble. No "Great news!".
 - Diegetic only: never show UUIDs, internal ids, status enums, action_id, or JSON keys.
@@ -111,7 +107,7 @@ Rules:
 - Do NOT invent numbers. Only report counts present in facts_json. Omit zero/missing sections.
 - If needs_approval is true (and kind is not daily_digest), say a draft is ready. Do not say
   "reply approve or reject" (Queue it / Skip buttons are attached). Never imply the bot
-  posts it: queueing hands the reply to the founder (extension) or the operator to post.
+  posts it: queueing hands the reply to the reader (extension) or the operator to post.
 - If rung_phrase is present, say what the comment does in plain language
   (just advice / names the product / includes a link). If menu_phrase is present, say what
   that community allows (advice-only / name but no link / name and a link). Never say
@@ -121,7 +117,7 @@ Rules:
   without any name. Never guess or invent a name.
 - If kind is pr_ready / outcome open: say the SEO fix PR is live on GitHub. Do not paste the URL
   (a button is attached). Mention repo or PR number lightly if useful.
-- If kind is blog_published / outcome published: the post the founder asked for is live on
+- If kind is blog_published / outcome published: the post is live on
   their blog. Name the title, one line. Do not paste the URL (a button is attached).
 - If kind is blog_published / outcome draft: a blog post is written and waiting. Name the
   title, one line. Do not say it is live. Do not paste the URL (View / Approve / Reject
@@ -130,16 +126,15 @@ Rules:
   product and the target domain. Say email or form paste from lane. Do not paste the
   pitch (Approve / Skip buttons are attached). Do not say it already went out.
 - If kind is daily_digest / outcome morning: this is the morning report. Open like
-  "morning. here is {day}, while you were shipping." then short lines for each non-empty
+  <MORNING> then short lines for each non-empty
   section (visitors, signups, citations, post, ads total, link building, sales, scout).
   Keep link and sales clearly separate. If needs_you is present, end with what needs them;
-  otherwise close with go build. Quiet day if almost nothing landed.
+  otherwise <CLOSE>. Quiet day if almost nothing landed.
 - In link / sales facts, replies_asking_fee counts webmasters who quoted a fee to publish.
   Nobody paid anyone: say they quoted a price, never "paid", and no 🎉 on it.
   replies_interested is a yes; replies_no a no.
 - If kind is daily_digest / outcome weekly: this is the weekly report, every count is the
-  total from {start} to {day}. Open like "your week, {start} to {day}, while you were
-  shipping." then the same short lines (posts is how many went live; post_title is the
+  total from {start} to {day}. Open like <WEEKLY> then the same short lines (posts is how many went live; post_title is the
   latest). Never call it today or yesterday. Quiet week if almost nothing landed.
 - For non-digest kinds: keep replies tight, 1-2 short lines.
 - On failure: say what blocked and the next move, plainly.
@@ -150,6 +145,18 @@ Rules:
 """
 
 
+def rewrite_system(raw_voice: str | None) -> str:
+    import voice
+
+    d = voice.digest(raw_voice)
+    rules = (
+        REWRITE_RULES.replace("<MORNING>", d["morning"])
+        .replace("<WEEKLY>", d["weekly"])
+        .replace("<CLOSE>", d["close"])
+    )
+    return voice.persona(raw_voice) + "\n\n" + rules
+
+
 def _facts_user_message(kind: str, payload: dict[str, Any], lang: str) -> str:
     import i18n
 
@@ -157,7 +164,7 @@ def _facts_user_message(kind: str, payload: dict[str, Any], lang: str) -> str:
     safe = {
         k: v
         for k, v in payload.items()
-        if k not in ("draft_text", "action_id")
+        if k not in ("draft_text", "action_id", "voice")
     }
     if kind == "daily_digest":
         period = "weekly" if payload.get("outcome") == "weekly" else "morning"
@@ -207,7 +214,7 @@ async def rewrite(
         raise RuntimeError("llm_model_uuid not configured")
 
     lang_n = i18n.report_lang(lang) or i18n.normalize_lang(lang)
-    system = REWRITE_SYSTEM
+    system = rewrite_system(payload.get("voice"))
     if lang_n != "en":
         system = system.rstrip() + "\n\n" + i18n.prompt_lang_line(lang_n)
 

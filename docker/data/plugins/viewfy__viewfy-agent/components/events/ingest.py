@@ -17,6 +17,7 @@ _root = str(Path(__file__).resolve().parents[2])
 if _root not in sys.path:
     sys.path.insert(0, _root)
 import i18n  # noqa: E402
+import voice  # noqa: E402
 
 log = logging.getLogger("viewfy_agent.ingest")
 
@@ -492,6 +493,11 @@ class IngestListener(EventListener):
                     if pin_line not in _content_blob(prompts):
                         prompts.append(
                             provider_message.Message(role="system", content=pin_line)
+                        )
+                    reader = voice.chat_line(pin.get("voice"), pin["product_name"])
+                    if reader and reader not in _content_blob(prompts):
+                        prompts.append(
+                            provider_message.Message(role="system", content=reader)
                         )
 
             # DMs have no pin to anchor on, so name the founder's products instead.
