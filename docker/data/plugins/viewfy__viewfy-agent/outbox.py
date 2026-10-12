@@ -134,6 +134,9 @@ Rules:
   section (visitors, signups, citations, post, ads total, link building, sales, scout).
   Keep link and sales clearly separate. If needs_you is present, end with what needs them;
   otherwise close with go build. Quiet day if almost nothing landed.
+- In link / sales facts, replies_paid counts replies that ASKED to be paid (a webmaster
+  quoting a price for the placement). Nobody paid anyone: say "asked for a fee" or "quoted
+  a price", never "paid", and no 🎉 on it. replies_interested is a yes; replies_no a no.
 - If kind is daily_digest / outcome weekly: this is the weekly report, every count is the
   total from {start} to {day}. Open like "your week, {start} to {day}, while you were
   shipping." then the same short lines (posts is how many went live; post_title is the
