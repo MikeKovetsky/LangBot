@@ -12,6 +12,20 @@ _RU_RE = re.compile(r"[ыЫэЭъЪёЁ]")
 _CYR_RE = re.compile(r"[\u0400-\u04FF]")
 
 LANG_NAMES = {"en": "English", "ua": "Ukrainian", "ru": "Russian"}
+# A report language the founder fixed on the product (Viewfy
+# core/notify/schedule.LANGS). Chat replies stay en | ua | ru.
+REPORT_LANG_NAMES = {
+    **LANG_NAMES,
+    "es": "Spanish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "cs": "Czech",
+    "pl": "Polish",
+    "de": "German",
+    "fr": "French",
+    "it": "Italian",
+    "tr": "Turkish",
+}
 
 
 def normalize_lang(raw: str | None) -> Lang:
@@ -25,6 +39,15 @@ def normalize_lang(raw: str | None) -> Lang:
     if primary == "en":
         return "en"
     return "en"
+
+
+def report_lang(raw: str | None) -> Lang | None:
+    """The payload's fixed report language, or None to use the chat's."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    code = raw.strip().lower().replace("_", "-").split("-", 1)[0]
+    code = "ua" if code == "uk" else code
+    return code if code in REPORT_LANG_NAMES else None
 
 
 def lang_from_remark(remark: str | None) -> Lang | None:
@@ -143,7 +166,7 @@ def wake_hint(lang: Lang) -> str:
 
 
 def prompt_lang_line(lang: Lang) -> str:
-    name = LANG_NAMES.get(lang, "English")
+    name = REPORT_LANG_NAMES.get(lang, "English")
     return (
         f"LANGUAGE LOCK: reply entirely in {name} ({lang}). "
         f"Every line of every reply — greetings, status, metrics, lists, CTAs, errors — "

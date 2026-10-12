@@ -134,6 +134,10 @@ Rules:
   section (visitors, signups, citations, post, ads total, link building, sales, scout).
   Keep link and sales clearly separate. If needs_you is present, end with what needs them;
   otherwise close with go build. Quiet day if almost nothing landed.
+- If kind is daily_digest / outcome weekly: this is the weekly report, every count is the
+  total from {start} to {day}. Open like "your week, {start} to {day}, while you were
+  shipping." then the same short lines (posts is how many went live; post_title is the
+  latest). Never call it today or yesterday. Quiet week if almost nothing landed.
 - For non-digest kinds: keep replies tight, 1-2 short lines.
 - On failure: say what blocked and the next move, plainly.
 - Celebrate real wins lightly with 🎉. Occasional blue emoji ok. No spam.
@@ -153,8 +157,9 @@ def _facts_user_message(kind: str, payload: dict[str, Any], lang: str) -> str:
         if k not in ("draft_text", "action_id")
     }
     if kind == "daily_digest":
+        period = "weekly" if payload.get("outcome") == "weekly" else "morning"
         shape = (
-            "Rewrite these facts into a complete morning Telegram report "
+            f"Rewrite these facts into a complete {period} Telegram report "
             "(greeting + one short line per non-empty section). "
             "Do not invent metrics."
         )
@@ -198,7 +203,7 @@ async def rewrite(
     if not model:
         raise RuntimeError("llm_model_uuid not configured")
 
-    lang_n = i18n.normalize_lang(lang)
+    lang_n = i18n.report_lang(lang) or i18n.normalize_lang(lang)
     system = REWRITE_SYSTEM
     if lang_n != "en":
         system = system.rstrip() + "\n\n" + i18n.prompt_lang_line(lang_n)
@@ -402,12 +407,14 @@ def _build_markup(
 
 async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
     import cta
+    import i18n
 
     payload = item.get("payload") or {}
     kind = item.get("kind") or "report"
     tg_uid = str(item["telegram_user_id"])
     chat_id = str(item.get("telegram_chat_id") or tg_uid)
-    lang = plugin.lang_for(tg_uid)
+    # A founder-fixed report language beats the chat's Telegram language.
+    lang = i18n.report_lang(payload.get("lang")) or plugin.lang_for(tg_uid)
     if kind == "link_report" and payload.get("outcome") == "quoted":
         text = link_quote_text(payload, lang)
     else:
@@ -423,8 +430,6 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
 
     # New members don't know the group wake rules; state them verbatim once.
     if kind == "product_invite_accepted" and chat_id.startswith("-"):
-        import i18n
-
         text = f"{text}\n\n{i18n.wake_hint(lang)}"
 
     # Digest: Review drafts CTA when needs_approval. Per-draft Approve/Reject stay on scout.
