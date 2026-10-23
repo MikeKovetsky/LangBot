@@ -626,8 +626,10 @@ class ViewfyAgentPlugin(BasePlugin):
                 "tool without asking which one."
             )
         else:
+            # Say when the list is cut: read as complete, eight names hid Viewfy, the 41st (2026-10-23).
+            more = f" and {len(named) - 8} more" if len(named) > 8 else ""
             line = (
-                f"The founder's products: {', '.join(named[:8])}. Ask which one by "
+                f"The founder's products: {', '.join(named[:8])}{more}. Ask which one by "
                 "name or domain when it is ambiguous."
             )
         return line + (

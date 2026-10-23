@@ -6,10 +6,10 @@ metadata:
     en_US: products
     zh_Hans: products
   description:
-    en_US: "List the user's products, or get one by id. Prefer this before other product tools."
-    zh_Hans: "List the user's products, or get one by id. Prefer this before other product tools."
+    en_US: "List the user's products, or get one by id, name or domain. Every tool's product_id takes a product's name or domain as the user said it, so there is no need to list products to find an id."
+    zh_Hans: "List the user's products, or get one by id, name or domain. Every tool's product_id takes a product's name or domain as the user said it, so there is no need to list products to find an id."
 spec:
-  parameters: {"type": "object", "properties": {"id": {"type": "string", "description": "Product UUID. Omit to list."}}, "required": [], "additionalProperties": false}
+  parameters: {"type": "object", "properties": {"id": {"type": "string", "description": "A product's id, name or domain. Omit to list."}}, "required": [], "additionalProperties": false}
   llm_prompt: >-
     List the user's Viewfy products, or get one by id. Getting by id includes cloudflare.blog /
     cloudflare.inbox — read those before claiming Cloudflare is not connected.

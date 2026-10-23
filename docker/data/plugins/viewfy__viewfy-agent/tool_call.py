@@ -90,6 +90,17 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
     }
 
 
+def _slim_products(out: dict[str, Any]) -> dict[str, Any]:
+    """A product list keeps its summary whole: it names every product, and product_id
+    takes a name or domain, so the ids are what can go. The generic cut at 1,500
+    characters dropped the oldest products first, Viewfy (the 41st) on 2026-10-23."""
+    summary = (out.get("summary") or "").strip()
+    return {
+        "summary": f"{summary} Ids left out to fit: pass a product's name or domain as product_id.",
+        "data": {"truncated": True, "tool": "products"},
+    }
+
+
 def _slim_scout_queue(out: dict[str, Any]) -> dict[str, Any]:
     """Keep target_url / permalink; drop draft bodies that blow the tool budget."""
     data = out.get("data") if isinstance(out.get("data"), dict) else {}
@@ -148,6 +159,10 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
         slim = _slim_links_outreach(out)
     elif tool_name in ("scout_queue", "roam_queue") and isinstance(data.get("actions"), list):
         slim = _slim_scout_queue(out)
+    elif tool_name == "products" and isinstance(data.get("products"), list):
+        slim = _slim_products(out)
+        if len(_dumps(slim)) > TOOL_JSON_MAX:
+            slim = _slim_generic(out, tool_name)
     else:
         slim = _slim_generic(out, tool_name)
 
