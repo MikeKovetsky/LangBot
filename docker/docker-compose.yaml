@@ -2,10 +2,12 @@
 # For Kubernetes deployment, see kubernetes.yaml and the deployment guide at https://docs.langbot.app
 version: "3"
 
+# Pinned to the tag docker/railway/Dockerfile builds from: the patched core files
+# mounted below match it, and `latest` (4.11+) refuses the legacy pipeline.
 services:
 
   langbot_plugin_runtime:
-    image: rockchin/langbot:latest
+    image: rockchin/langbot:v4.10.11
     container_name: langbot_plugin_runtime
     volumes:
       - ./data/plugins:/app/data/plugins
@@ -32,7 +34,7 @@ services:
   # set ``box.enabled: false`` in ``data/config.yaml`` (or
   # ``BOX__ENABLED=false`` in the langbot service env below) to match.
   langbot_box:
-    image: rockchin/langbot:latest
+    image: rockchin/langbot:v4.10.11
     container_name: langbot_box
     profiles: ["box", "all"]
     volumes:
@@ -70,7 +72,7 @@ services:
       - langbot_network
 
   langbot:
-    image: rockchin/langbot:latest
+    image: rockchin/langbot:v4.10.11
     container_name: langbot
     volumes:
       - ./data:/app/data
