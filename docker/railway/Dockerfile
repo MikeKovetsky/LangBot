@@ -8,7 +8,9 @@
 # Pinned: `latest` moved to 4.11 (2026-10-14), which needs every legacy pipeline migrated and does not match the
 # three patched files below (a rebuild on 2026-10-23 answered every chat with "Agent runner not found ... legacy
 # (pre-4.11) pipelines must be migrated"). v4.10.11 is what `latest` was at the 2026-10-12 build that ran until then.
-# Moving up means re-diffing the patches and migrating the pipeline, deliberately.
+# Moving up means re-diffing the patches and migrating the pipeline, deliberately, and copying data/langbot.db
+# first: 4.11 migrates it one way on boot (Alembic 0023 to 0040, dropping bots.use_pipeline_uuid), and 4.10.11 then
+# refuses to start ("Can't locate revision"). docker-compose.yaml pins the same tag.
 FROM rockchin/langbot:v4.10.11
 
 # Dogfood patches. Kept in step with docker-compose.yaml, which mounts these
