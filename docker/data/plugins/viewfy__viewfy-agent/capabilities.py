@@ -7,6 +7,7 @@ from __future__ import annotations
 
 WRITE_CAPABLE: frozenset[str] = frozenset(
     {
+        "ads",
         "blog",
         "connect",
         "group_pin",

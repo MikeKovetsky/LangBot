@@ -427,6 +427,10 @@ async def deliver(plugin: ViewfyAgentPlugin, item: dict[str, Any]) -> str:
     lang = i18n.report_lang(payload.get("lang")) or plugin.lang_for(tg_uid)
     if kind == "link_report" and payload.get("outcome") == "quoted":
         text = link_quote_text(payload, lang)
+    elif kind.startswith("ads_"):
+        # Ads cards and answers are composed in Viewfy (core/ads): numbers and decisions go out word for word,
+        # never through the rewrite that once dropped prices from link cards.
+        text = (payload.get("text") or "").strip() or "…"
     else:
         intro = await rewrite(plugin, kind, payload, lang=lang)
         if (
