@@ -5,7 +5,11 @@
 # the host. Railway has no host to mount from and bills per service, so here the
 # patches and the plugin are baked in and the runtime is started beside LangBot,
 # reached over localhost — the same transport LangBot already uses on Windows.
-FROM rockchin/langbot:latest
+# Pinned: `latest` moved to 4.11 (2026-10-14), which needs every legacy pipeline migrated and does not match the
+# three patched files below (a rebuild on 2026-10-23 answered every chat with "Agent runner not found ... legacy
+# (pre-4.11) pipelines must be migrated"). v4.10.11 is what `latest` was at the 2026-10-12 build that ran until then.
+# Moving up means re-diffing the patches and migrating the pipeline, deliberately.
+FROM rockchin/langbot:v4.10.11
 
 # Dogfood patches. Kept in step with docker-compose.yaml, which mounts these
 # same three files; a base image bump means re-diffing them.
