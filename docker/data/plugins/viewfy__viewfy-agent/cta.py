@@ -91,6 +91,7 @@ TOOL_CTA = {
     "inbox": "connect_cf_inbox_btn",  # attach → Cloudflare OAuth
     "product_invite": "invite_btn",
     "product_members": "invite_btn",
+    "ads": "ads_open_btn",  # a launch the product keeps manual: the one-click Ads Manager link
 }
 
 
@@ -194,7 +195,9 @@ def cta_from_tool(tool: str, payload: dict[str, Any]) -> tuple[str, str] | None:
     if tool not in TOOL_CTA:
         return None
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-    url = (data.get("url") or data.get("button_url") or "").strip()
+    # ads results carry links on most actions; only button_url (a manual launch) is an action for the user.
+    raw = data.get("button_url") if tool == "ads" else (data.get("url") or data.get("button_url"))
+    url = (raw or "").strip()
     if not url.startswith("https://"):
         return None
     # inbox: only attach CTA for custom-domain OAuth (action=attach)

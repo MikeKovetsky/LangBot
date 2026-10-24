@@ -68,3 +68,14 @@ async def test_a_dm_prompt_naming_some_products_says_there_are_more(plugin):
     line = await main.ViewfyAgentPlugin.product_anchor(Founder(), '1')
     assert 'Product 0 (product0.com)' in line and 'and 33 more.' in line
     assert 'Pass the name or domain as product_id' in line
+
+
+def test_a_manual_launch_comes_with_its_ads_manager_button_and_other_ads_links_do_not(plugin):
+    import cta
+
+    url = 'https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1&selected_campaign_ids=2'
+    launch = {'data': {'launched': False, 'needs': 'manual', 'ads_manager': url, 'button_url': url}}
+    assert cta.cta_from_tool('ads', launch) == ('ads', url)
+    # A created campaign or a status read carries its link too, but asks nothing of the user yet.
+    assert cta.cta_from_tool('ads', {'data': {'ads_manager': url, 'url': url}}) is None
+    assert cta.label_for_tool('ads', launch['data'], 'en') == 'Open in Ads Manager'

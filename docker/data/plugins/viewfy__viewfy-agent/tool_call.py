@@ -242,6 +242,13 @@ async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: 
             else f"Инвайт на {name} — кнопка ниже." if lang == "ru"
             else f"Invite for {name} — tap below."
         )
+    elif tool_name == "ads":
+        name = data.get("name") or ""
+        text = (
+            f"Увімкнення тут ручне: перемкни {name} в Ads Manager, кнопка нижче." if lang == "ua"
+            else f"Включение здесь ручное: переключи {name} в Ads Manager, кнопка ниже." if lang == "ru"
+            else f"Launches are manual here: switch {name} on in Ads Manager with the button below."
+        ).replace("  ", " ")
     else:
         text = i18n.t(lang, "tap_below")
 
