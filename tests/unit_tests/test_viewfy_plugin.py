@@ -4,6 +4,7 @@ On 2026-10-23 Mike's DM could not find Viewfy, his 41st product: the DM's prompt
 were all, and a product list over the tool-result budget kept 1,500 characters of its summary.
 """
 
+import json
 import sys
 import uuid
 from pathlib import Path
@@ -79,3 +80,48 @@ def test_a_manual_launch_comes_with_its_ads_manager_button_and_other_ads_links_d
     # A created campaign or a status read carries its link too, but asks nothing of the user yet.
     assert cta.cta_from_tool('ads', {'data': {'ads_manager': url, 'url': url}}) is None
     assert cta.label_for_tool('ads', launch['data'], 'en') == 'Open in Ads Manager'
+
+
+class _Telegram:
+    """The plugin as _send_tool_cta uses it: Telegram's answer to sendMessage, and what was sent."""
+
+    bot_token = 'token'
+
+    def __init__(self, ok: bool):
+        self.ok, self.sent = ok, []
+
+    def lang_for(self, telegram_user_id):
+        return 'en'
+
+    async def _tg(self, method, body):
+        self.sent.append(body)
+        return {'ok': self.ok}
+
+    async def ingest(self, **kwargs):
+        pass
+
+
+async def test_a_manual_launch_sends_its_button_and_hands_the_model_no_link_to_paste(plugin):
+    """The tool's summary (core/agent/tools.py, _ads_launch) has the model write the link in words. Once the button
+    is out, a link in the reply would come back as a second button, so the model reads the answer without it."""
+    _, tool_call = plugin
+    url = 'https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1&selected_campaign_ids=2'
+    raw = json.dumps({
+        'summary': (
+            'Launches are manual for this product, so a person switches Navi on with one toggle in Ads Manager. '
+            f'Reply with that as the one action, the link in words: [Switch it on in Ads Manager]({url})'
+        ),
+        'data': {'launched': False, 'needs': 'manual', 'name': 'Navi', 'ads_manager': url, 'button_url': url},
+    })
+
+    chat = _Telegram(ok=True)
+    out = json.loads(await tool_call._send_tool_cta(chat, 'ads', raw, '42', '7'))
+    (sent,) = chat.sent
+    assert sent['reply_markup'] == {'inline_keyboard': [[{'text': 'Open in Ads Manager', 'url': url, 'style': 'primary'}]]}
+    assert sent['text'] == 'Launches are manual here: switch Navi on in Ads Manager with the button below.'
+    assert url not in out['summary'] and 'link in words' not in out['summary']
+    assert 'switches Navi on. Button sent in Telegram (Open in Ads Manager)' in out['summary']
+    assert out['data']['button_sent'] is True
+
+    # Telegram refused the button: the answer stays as the tool gave it, link and all, for the model to write.
+    assert await tool_call._send_tool_cta(_Telegram(ok=False), 'ads', raw, '42', '7') == raw

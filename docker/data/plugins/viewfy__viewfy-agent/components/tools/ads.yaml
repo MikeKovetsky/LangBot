@@ -16,14 +16,15 @@ spec:
     exactly as the tool's summary words it. For status, rules or pausing one object, call those
     actions directly. To switch a campaign, ad set or ad on, call ads action=launch with
     object_id (an id or the campaign's name as the user said it); never decline a launch
-    yourself. When launches are manual it answers with a one-click Ads Manager link: give that
-    link as the one action. product_id takes the product's name or domain as the user wrote it
-    (viewfy.ai, DMarket), so there is no need to list products first. For anything that needs
-    several reads or writes in the ad account (how are the ads doing, build or edit a campaign,
-    targeting, budgets, creatives), call ads action=ask with their request in prompt, reply in
-    one short line that the answer follows in this chat, and stop: the answer arrives as its own
-    message. Never invent ad numbers, ids or results, and never claim a change the tool did not
-    make.
+    yourself. When launches are manual it answers with a one-click Ads Manager link as the one
+    action: when the result says the button was sent, point to that button and do not paste the
+    link; otherwise give the link in words. product_id takes the product's name or domain as the
+    user wrote it (viewfy.ai, DMarket), so there is no need to list products first. For anything
+    that needs several reads or writes in the ad account (how are the ads doing, build or edit a
+    campaign, targeting, budgets, creatives), call ads action=ask with their request in prompt,
+    reply in one short line that the answer follows in this chat, and stop: the answer arrives
+    as its own message. Never invent ad numbers, ids or results, and never claim a change the
+    tool did not make.
 execution:
   python:
     path: ads.py

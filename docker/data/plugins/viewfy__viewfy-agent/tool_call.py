@@ -209,6 +209,7 @@ async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: 
     data = out.get("data") if isinstance(out.get("data"), dict) else {}
     lang = plugin.lang_for(tg_id)
     label = cta.label_for_tool(tool_name, data, lang)
+    summary = out.get("summary") or ""
 
     # Short diegetic line; button carries the link.
     if tool_name == "connect":
@@ -249,6 +250,9 @@ async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: 
             else f"Включение здесь ручное: переключи {name} в Ads Manager, кнопка ниже." if lang == "ru"
             else f"Launches are manual here: switch {name} on in Ads Manager with the button below."
         ).replace("  ", " ")
+        # The tool's summary has the model write the link in words, which an MCP client needs. Here the button
+        # carries it, and a link in the reply would come back as a second button (ingest.py's reply CTAs).
+        summary = f"Launches are manual for this product: one toggle in Ads Manager switches {name or 'it'} on."
     else:
         text = i18n.t(lang, "tap_below")
 
@@ -262,7 +266,7 @@ async def _send_tool_cta(plugin, tool_name: str, raw: str, chat_id: str, tg_id: 
             meta={"kind": "cta_button", "tool": tool_name, "url": url, "via": "tool_call"},
         )
         out["summary"] = (
-            f"{out.get('summary') or ''} Button sent in Telegram ({label}). "
+            f"{summary} Button sent in Telegram ({label}). "
             "Do not paste the URL in chat."
         ).strip()
         out["data"] = {**data, "button_sent": True}
