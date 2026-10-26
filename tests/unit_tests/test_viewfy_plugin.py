@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 PLUGIN = Path(__file__).resolve().parents[2] / 'docker/data/plugins/viewfy__viewfy-agent'
-MODULES = ('main', 'tool_call', 'cta', 'i18n')
+MODULES = ('main', 'tool_call', 'cta', 'i18n', 'voice')
 VIEWFY = {'name': 'Viewfy | He gets you users while you ship', 'domain': 'viewfy.ai'}
 
 
@@ -131,6 +131,7 @@ async def test_a_manual_launch_sends_its_button_and_hands_the_model_no_link_to_p
 # claim sends the sign-in link only when Viewfy says the tapper is the speaker it was minted for (2026-10-26).
 
 SIGNIN = 'https://api.viewfy.ai/api/telegram/agent/invite?c=claim'
+CONNECT = 'https://api.viewfy.ai/api/telegram/agent/connect?t=own'
 
 
 class _Viewfy:
@@ -139,7 +140,7 @@ class _Viewfy:
     bot_token = 'token'
 
     def __init__(self, answer: dict):
-        self.answer, self.asked, self.sent, self.ingested = answer, [], [], []
+        self.answer, self.asked, self.sent, self.ingested, self.connect_offers = answer, [], [], [], []
 
     def lang_for(self, telegram_user_id):
         return 'en'
@@ -167,7 +168,9 @@ class _Viewfy:
         return True
 
     async def start_reply(self, telegram_user_id, lang=None):
-        raise AssertionError('an invite tap must not fall through to the Connect offer')
+        """The tapper's own Connect offer, which /start without an invite gets."""
+        self.connect_offers.append(telegram_user_id)
+        return 'Link Telegram to Viewfy to continue.', CONNECT
 
     async def me(self, telegram_user_id):
         return {'linked': False}
@@ -213,6 +216,10 @@ async def test_the_invite_claim_hands_the_sign_in_link_to_the_speaker_only(plugi
     assert ok.asked == [
         ('POST', '/api/telegram/agent/product_invite/claim', {'token': 'speakerTOKEN', 'telegram_user_id': '777'})
     ]
+    # A product named after its page title reads by its short name, as the DM's product anchor does.
+    titled = _Viewfy({'url': SIGNIN, 'product_name': 'DMarket | Buy and sell CS2 skins', 'product_domain': 'dmarket.com'})
+    text, _ = await claim(titled, '777', 'speakerTOKEN', 'ru')
+    assert text == 'Твой инвайт в DMarket (dmarket.com). Нажми «Присоединиться» и войди.'
 
     text, url = await claim(_Viewfy({'_http_status': 403, 'detail': 'invite is for another Telegram user'}), '888', 'speakerTOKEN', 'en')
     assert url is None and text.startswith('This Join button is for another member of the group')
@@ -233,7 +240,7 @@ async def test_a_tap_on_someone_elses_join_button_gets_a_refusal_and_no_sign_in(
     assert viewfy.asked[0][2] == {'token': 'speakerTOKEN', 'telegram_user_id': '888'}
     ((chat, text, url, _),) = viewfy.sent
     assert (chat, url) == ('888', None) and 'another member of the group' in text
-    assert ctx.stopped
+    assert ctx.stopped and viewfy.connect_offers == []
     assert viewfy.ingested[-1]['meta']['kind'] == 'product_invite_signin'
 
 
@@ -245,3 +252,18 @@ async def test_the_speakers_tap_gets_the_join_button_in_the_dm(plugin, monkeypat
     await ingest._handle_inbound(viewfy, ctx, event_name='PersonMessageReceived', is_group=False)
 
     assert viewfy.sent == [('777', "Here's your invite to DMarket. Tap Join and sign in.", SIGNIN, 'invite_btn')]
+    assert viewfy.connect_offers == []
+
+
+async def test_an_invite_start_typed_in_a_group_never_puts_a_sign_in_link_there(plugin, monkeypatch):
+    """Telegram opens t.me/<bot>?start= in the DM. Typed into the group, a claim would post the speaker's own sign-in
+    link where anyone can tap it, so in a group /start stays the sender's Connect offer."""
+    ingest = _ingest_module(monkeypatch)
+    viewfy = _Viewfy({'url': SIGNIN, 'product_name': 'DMarket'})
+    ctx = _Context('/start inv_speakerTOKEN', sender='777', chat='-1001')
+
+    await ingest._handle_inbound(viewfy, ctx, event_name='GroupMessageReceived', is_group=True)
+
+    assert [path for _, path, _ in viewfy.asked if path.endswith('/product_invite/claim')] == []
+    assert viewfy.connect_offers == ['777']
+    assert [url for _, _, url, _ in viewfy.sent] == [CONNECT]

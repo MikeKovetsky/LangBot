@@ -510,7 +510,8 @@ class ViewfyAgentPlugin(BasePlugin):
         if status is not None or not out.get("url"):
             log.warning("product invite claim failed: %s %s", status, out.get("detail"))
             return i18n.prepare_fail(lang_n, str(out.get("detail") or "")), None
-        return i18n.invite_claimed(lang_n, name=str(out.get("product_name") or "")), str(out["url"])
+        name = _short_name(out.get("product_name"), out.get("product_domain"))
+        return i18n.invite_claimed(lang_n, name=name), str(out["url"])
 
     async def offer_connect(
         self,
