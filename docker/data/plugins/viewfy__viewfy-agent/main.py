@@ -487,6 +487,31 @@ class ViewfyAgentPlugin(BasePlugin):
         )
         return text, str(facts["url"])
 
+    async def claim_product_invite(
+        self, telegram_user_id: str, token: str, lang: str | None = None
+    ) -> tuple[str, str | None]:
+        """`/start inv_<token>` in the bot DM: the sign-in link, for the invitee only.
+
+        The group's Join button is a deep link anyone in the group can tap. Here Telegram
+        vouches for the tapper, and Viewfy refuses (403) anyone but the speaker it was
+        minted for.
+        """
+        lang_n = i18n.normalize_lang(lang or self.lang_for(telegram_user_id))
+        out = await self._request(
+            "POST",
+            "/api/telegram/agent/product_invite/claim",
+            body={"token": token, "telegram_user_id": str(telegram_user_id)},
+        )
+        status = out.get("_http_status")
+        if status == 403:
+            return i18n.t(lang_n, "invite_not_yours"), None
+        if status in (404, 410):
+            return i18n.t(lang_n, "invite_gone"), None
+        if status is not None or not out.get("url"):
+            log.warning("product invite claim failed: %s %s", status, out.get("detail"))
+            return i18n.prepare_fail(lang_n, str(out.get("detail") or "")), None
+        return i18n.invite_claimed(lang_n, name=str(out.get("product_name") or "")), str(out["url"])
+
     async def offer_connect(
         self,
         *,

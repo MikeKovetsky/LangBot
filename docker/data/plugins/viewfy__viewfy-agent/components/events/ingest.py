@@ -11,6 +11,8 @@ from langbot_plugin.api.entities.builtin.platform import message as platform_mes
 from langbot_plugin.api.entities.builtin.provider import message as provider_message
 
 _START_RE = re.compile(r"^/start(?:@[A-Za-z0-9_]+)?(?:\s|$)", re.IGNORECASE)
+# A group's Join button is t.me/<bot>?start=inv_<token>: Telegram opens the DM and sends this.
+_INVITE_START_RE = re.compile(r"^/start(?:@[A-Za-z0-9_]+)?\s+inv_([A-Za-z0-9_-]{8,200})\s*$")
 
 # Sibling i18n lives at plugin root.
 _root = str(Path(__file__).resolve().parents[2])
@@ -351,6 +353,32 @@ async def _handle_inbound(plugin, event_context, *, event_name: str, is_group: b
                 return
 
     if not _START_RE.match(text):
+        return
+
+    invite = None if is_group else _INVITE_START_RE.match(text)
+    if invite:
+        event_context.prevent_default()
+        event_context.prevent_postorder()
+        try:
+            reply, url = await plugin.claim_product_invite(tg_id, invite.group(1), lang)
+        except Exception as e:
+            log.exception("product invite claim failed")
+            reply, url = i18n.prepare_fail(lang, str(e)), None
+        sent = await plugin.send_connect_message(
+            chat_id, reply, url, lang=lang, button_key="invite_btn", sticker=False
+        )
+        if not sent:
+            reply = reply if not url else f"{reply}\n\n{url}"
+            await event_context.reply(
+                platform_message.MessageChain([platform_message.Plain(text=reply)])
+            )
+        await plugin.ingest(
+            telegram_user_id=tg_id,
+            telegram_chat_id=chat_id,
+            direction="out",
+            text=reply,
+            meta={"kind": "product_invite_signin", "url": url, "lang": lang, "group": False},
+        )
         return
 
     # /start: diegetic Connect offer; bind is still per user.

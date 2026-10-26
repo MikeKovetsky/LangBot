@@ -156,6 +156,11 @@ def invite_offer(
     return tpl
 
 
+def invite_claimed(lang: Lang, *, name: str) -> str:
+    """The bot DM's line above the invitee's own Join (sign-in) button."""
+    return t(lang, "invite_claimed").format(name=(name or "").strip() or "the product")
+
+
 def connect_offer(lang: Lang) -> str:
     return t(lang, "connect_offer")
 
@@ -193,6 +198,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "view_btn": "View",
         "invite_btn": "Join",
         "invite_offer": "I sent you an invite to our team.",
+        "invite_claimed": "Here's your invite to {name}. Tap Join and sign in.",
+        "invite_not_yours": (
+            "This Join button is for another member of the group, so it can't sign you in. "
+            "To get your own, mention me in the group."
+        ),
+        "invite_gone": "This invite has expired or was already used.",
         "connect_offer": "Link Telegram to Viewfy to continue.",
         "thread_btn": "Open thread",
         "open_btn": "Open",
@@ -251,6 +262,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "view_btn": "Відкрити",
         "invite_btn": "Приєднатись",
         "invite_offer": "Я вислав тобі інвайт в нашу команду.",
+        "invite_claimed": "Твій інвайт у {name}. Натисни «Приєднатись» і увійди.",
+        "invite_not_yours": (
+            "Ця кнопка «Приєднатись» для іншого учасника групи, тож увійти через неї не вийде. "
+            "Щоб отримати свою, тегни мене в групі."
+        ),
+        "invite_gone": "Цей інвайт уже недійсний: термін минув або ним уже скористались.",
         "connect_offer": "Привʼяжи Telegram до Viewfy, щоб продовжити.",
         "thread_btn": "Відкрити тред",
         "open_btn": "Відкрити",
@@ -308,6 +325,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "view_btn": "Открыть",
         "invite_btn": "Присоединиться",
         "invite_offer": "Я отправил тебе инвайт в нашу команду.",
+        "invite_claimed": "Твой инвайт в {name}. Нажми «Присоединиться» и войди.",
+        "invite_not_yours": (
+            "Эта кнопка «Присоединиться» для другого участника группы, так что войти через неё не получится. "
+            "Чтобы получить свою, отметь меня в группе."
+        ),
+        "invite_gone": "Этот инвайт уже недействителен: срок истёк или им уже воспользовались.",
         "connect_offer": "Привяжи Telegram к Viewfy, чтобы продолжить.",
         "thread_btn": "Открыть тред",
         "open_btn": "Открыть",

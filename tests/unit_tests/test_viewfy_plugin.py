@@ -125,3 +125,123 @@ async def test_a_manual_launch_sends_its_button_and_hands_the_model_no_link_to_p
 
     # Telegram refused the button: the answer stays as the tool gave it, link and all, for the model to write.
     assert await tool_call._send_tool_cta(_Telegram(ok=False), 'ads', raw, '42', '7') == raw
+
+
+# A speaker's Join button in a group is t.me/<bot>?start=inv_<token>, so anyone in the group can tap it. The DM
+# claim sends the sign-in link only when Viewfy says the tapper is the speaker it was minted for (2026-10-26).
+
+SIGNIN = 'https://api.viewfy.ai/api/telegram/agent/invite?c=claim'
+
+
+class _Viewfy:
+    """The plugin as the invite DM uses it: Viewfy's answer to the claim, and what went out."""
+
+    bot_token = 'token'
+
+    def __init__(self, answer: dict):
+        self.answer, self.asked, self.sent, self.ingested = answer, [], [], []
+
+    def lang_for(self, telegram_user_id):
+        return 'en'
+
+    def remember_lang(self, telegram_user_id, lang):
+        return lang
+
+    def turn_start(self, chat_id):
+        pass
+
+    def set_quote(self, chat_id, quote):
+        pass
+
+    async def _request(self, method, path, *, body=None, **kwargs):
+        self.asked.append((method, path, body))
+        return dict(self.answer)
+
+    async def claim_product_invite(self, telegram_user_id, token, lang=None):
+        import main
+
+        return await main.ViewfyAgentPlugin.claim_product_invite(self, telegram_user_id, token, lang)
+
+    async def send_connect_message(self, chat_id, text, url=None, **kwargs):
+        self.sent.append((chat_id, text, url, kwargs.get('button_key')))
+        return True
+
+    async def start_reply(self, telegram_user_id, lang=None):
+        raise AssertionError('an invite tap must not fall through to the Connect offer')
+
+    async def me(self, telegram_user_id):
+        return {'linked': False}
+
+    async def ingest(self, **kwargs):
+        self.ingested.append(kwargs)
+
+
+class _Context:
+    def __init__(self, text: str, sender: str, chat: str):
+        from langbot_plugin.api.entities.builtin.platform import message as platform_message
+
+        chain = platform_message.MessageChain([platform_message.Plain(text=text)])
+        self.event = type('Event', (), {'message_chain': chain, 'sender_id': sender, 'launcher_id': chat})()
+        self.stopped = False
+
+    def prevent_default(self):
+        self.stopped = True
+
+    def prevent_postorder(self):
+        pass
+
+    async def reply(self, chain):
+        raise AssertionError('the button went out; no plain reply')
+
+
+def _ingest_module(monkeypatch):
+    import importlib.util
+
+    monkeypatch.syspath_prepend(str(PLUGIN))
+    spec = importlib.util.spec_from_file_location('viewfy_ingest', PLUGIN / 'components/events/ingest.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+async def test_the_invite_claim_hands_the_sign_in_link_to_the_speaker_only(plugin):
+    main, _ = plugin
+    claim = main.ViewfyAgentPlugin.claim_product_invite
+
+    ok = _Viewfy({'url': SIGNIN, 'product_name': 'DMarket'})
+    assert await claim(ok, '777', 'speakerTOKEN', 'en') == ("Here's your invite to DMarket. Tap Join and sign in.", SIGNIN)
+    assert ok.asked == [
+        ('POST', '/api/telegram/agent/product_invite/claim', {'token': 'speakerTOKEN', 'telegram_user_id': '777'})
+    ]
+
+    text, url = await claim(_Viewfy({'_http_status': 403, 'detail': 'invite is for another Telegram user'}), '888', 'speakerTOKEN', 'en')
+    assert url is None and text.startswith('This Join button is for another member of the group')
+    text, url = await claim(_Viewfy({'_http_status': 410, 'detail': 'invite expired or already used'}), '777', 'speakerTOKEN', 'ua')
+    assert url is None and text == 'Цей інвайт уже недійсний: термін минув або ним уже скористались.'
+    # A dropped connection is neither a refusal nor an expiry.
+    text, url = await claim(_Viewfy({'_http_status': 0, 'detail': 'timed out'}), '777', 'speakerTOKEN', 'en')
+    assert url is None and text == "Couldn't create that link. Try again in a minute."
+
+
+async def test_a_tap_on_someone_elses_join_button_gets_a_refusal_and_no_sign_in(plugin, monkeypatch):
+    ingest = _ingest_module(monkeypatch)
+    viewfy = _Viewfy({'_http_status': 403, 'detail': 'invite is for another Telegram user'})
+    ctx = _Context('/start inv_speakerTOKEN', sender='888', chat='888')
+
+    await ingest._handle_inbound(viewfy, ctx, event_name='PersonMessageReceived', is_group=False)
+
+    assert viewfy.asked[0][2] == {'token': 'speakerTOKEN', 'telegram_user_id': '888'}
+    ((chat, text, url, _),) = viewfy.sent
+    assert (chat, url) == ('888', None) and 'another member of the group' in text
+    assert ctx.stopped
+    assert viewfy.ingested[-1]['meta']['kind'] == 'product_invite_signin'
+
+
+async def test_the_speakers_tap_gets_the_join_button_in_the_dm(plugin, monkeypatch):
+    ingest = _ingest_module(monkeypatch)
+    viewfy = _Viewfy({'url': SIGNIN, 'product_name': 'DMarket'})
+    ctx = _Context('/start inv_speakerTOKEN', sender='777', chat='777')
+
+    await ingest._handle_inbound(viewfy, ctx, event_name='PersonMessageReceived', is_group=False)
+
+    assert viewfy.sent == [('777', "Here's your invite to DMarket. Tap Join and sign in.", SIGNIN, 'invite_btn')]
