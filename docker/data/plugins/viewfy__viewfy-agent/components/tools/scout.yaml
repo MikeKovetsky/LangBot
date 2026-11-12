@@ -23,10 +23,12 @@ spec:
     one. That is a hard skip for discovery and waiting drafts, not a brief revise. When someone
     sends LinkedIn profile links to follow (people whose posts they want comment drafts for),
     call action=watch with every link as profiles; to stop following someone, action=unwatch.
-    Say how many were added and that new posts are read at 05:00 and 17:00 UTC; name any link
-    that was not a profile and ask for the linkedin.com/in/... one. Never say a list changed
-    unless the call succeeded. action=set is for post_access and needs the policy scope, which
-    this chat does not have; do not offer it.
+    Relay the reply as it reads: how many were added or removed, any link that was not a profile
+    (ask for the linkedin.com/in/... one) or over the profile limit, and when the posts are
+    read, or that LinkedIn reading is switched off for this product if the reply says so. Never
+    say a list changed unless the call succeeded and the reply says profiles were added or
+    removed. action=set is for post_access and needs the policy scope, which this chat does not
+    have; do not offer it.
 execution:
   python:
     path: scout.py
