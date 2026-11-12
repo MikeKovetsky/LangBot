@@ -59,6 +59,67 @@ def test_a_product_list_that_fits_goes_through_whole(plugin):
     assert tool_call._fit_tool_json('products', small) == (small, False)
 
 
+def _scout(n_channels: int, n_profiles: int, active: int = 1) -> dict:
+    """The scout tool's get as core/agent/tools.py answers it: every channel with its whole brief."""
+    channels = [
+        {
+            'channel': f'ch{i}', 'label': f'Channel {i}', 'active': i < active, 'auto': False, 'daily_cap': 3,
+            'standing': 'unknown', 'standing_line': 'line ' * 20, 'post_access': 'none', 'prompt': 'brief ' * 1200,
+        }
+        for i in range(n_channels)
+    ]
+    watch = [f'https://www.linkedin.com/in/person-number-{i}/' for i in range(n_profiles)]
+    return {
+        'summary': f'{n_channels} channels; watching {n_profiles} LinkedIn profiles',
+        'data': {'channels': channels, 'hunt': 'Alex comments on pricing. ' * 50, 'linkedin_watch': watch},
+    }
+
+
+def test_a_scout_get_over_the_budget_keeps_the_whole_watch_list(plugin):
+    """Competera, 2026-11-12: 21 channels with briefs answered about 100,000 characters, and asked for "перші 5
+    профайлів" the bot had no list to show."""
+    _, tool_call = plugin
+    out, oversized = tool_call._fit_tool_json('scout', _scout(21, 21))
+    assert oversized and len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
+    data = out['data']
+    assert data['linkedin_watch'] == _scout(21, 21)['data']['linkedin_watch']
+    assert 'linkedin_watch_total' not in data and 'error' not in out
+    assert data['hunt'].startswith('Alex comments on pricing.')
+    assert all('prompt' not in c and 'standing_line' not in c for c in data['channels'])
+    assert len(data['channels']) == 21 and data['briefs_left_out'] and 'channels_off_left_out' not in data
+
+
+def test_a_scout_get_keeps_every_channel_when_only_the_briefs_were_too_long(plugin):
+    _, tool_call = plugin
+    out, oversized = tool_call._fit_tool_json('scout', _scout(4, 3, active=2))
+    assert oversized and len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
+    assert [c['channel'] for c in out['data']['channels']] == ['ch0', 'ch1', 'ch2', 'ch3']
+    assert out['data']['briefs_left_out'] and 'channels_off_left_out' not in out['data']
+
+
+def test_a_watch_list_too_long_for_one_reply_keeps_its_head_and_its_total(plugin):
+    _, tool_call = plugin
+    for answer in (_scout(21, 150), {'summary': 'Added 1', 'data': {'added': ['x'], 'linkedin_watch': _scout(0, 150)['data']['linkedin_watch']}}):
+        out, oversized = tool_call._fit_tool_json('scout', answer)
+        assert oversized and len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
+        shown = out['data']['linkedin_watch']
+        assert out['data']['linkedin_watch_total'] == 150
+        if 'channels' in answer['data']:
+            # The switched-off channels went first; the one that is on stays.
+            assert [c['channel'] for c in out['data']['channels']] == ['ch0']
+            assert out['data']['channels_off_left_out'] == 20
+        assert 0 < len(shown) < 150 and shown == answer['data']['linkedin_watch'][: len(shown)]
+        # The head is as long as fits: one more profile would not.
+        more = dict(out['data'], linkedin_watch=answer['data']['linkedin_watch'][: len(shown) + 1])
+        assert len(tool_call._dumps({**out, 'data': more})) > tool_call.TOOL_JSON_MAX
+
+
+def test_a_scout_answer_that_fits_goes_through_whole(plugin):
+    _, tool_call = plugin
+    small = {'summary': 'Added 1', 'data': {'added': ['x'], 'linkedin_watch': ['a', 'b']}}
+    assert tool_call._fit_tool_json('scout', small) == (small, False)
+
+
 async def test_a_dm_prompt_naming_some_products_says_there_are_more(plugin):
     main, _ = plugin
 

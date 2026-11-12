@@ -90,6 +90,51 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
     }
 
 
+# What a scout channel row keeps when its brief is left out.
+_SCOUT_CHANNEL_KEEP = ("channel", "label", "active", "auto", "daily_cap", "standing")
+
+
+def _slim_scout(out: dict[str, Any]) -> dict[str, Any]:
+    """The scout tool's answer without the channel briefs, then without the channels that are off,
+    then with the LinkedIn watch list cut to what fits and its total kept.
+
+    `scout action=get` carries every channel's whole brief, about 7,000 characters each: Competera's
+    21 channels answered about 100,000 characters, the generic cut left the summary alone, and asked
+    for "перші 5 профайлів" the bot had no list to show (2026-11-12). The watched profiles are what a
+    founder asks this tool for, and a brief is one `scout revise` away.
+    """
+    data = dict(out["data"]) if isinstance(out.get("data"), dict) else {}
+    slim = {**out, "data": data}
+    chans = data.get("channels")
+    if isinstance(chans, list):
+        data["channels"] = [
+            {k: c[k] for k in _SCOUT_CHANNEL_KEEP if k in c} if isinstance(c, dict) else c for c in chans
+        ]
+        data["briefs_left_out"] = True
+        if len(_dumps(slim)) <= TOOL_JSON_MAX:
+            return slim
+        on = [c for c in data["channels"] if isinstance(c, dict) and c.get("active")]
+        data["channels_off_left_out"] = len(data["channels"]) - len(on)
+        data["channels"] = on
+        if len(_dumps(slim)) <= TOOL_JSON_MAX:
+            return slim
+    watch = data.get("linkedin_watch")
+    if isinstance(watch, list) and watch:
+        data["linkedin_watch_total"] = len(watch)
+        lo, hi = 0, len(watch)
+        while lo < hi:  # the longest head of the list that fits
+            mid = (lo + hi + 1) // 2
+            data["linkedin_watch"] = watch[:mid]
+            if len(_dumps(slim)) <= TOOL_JSON_MAX:
+                lo = mid
+            else:
+                hi = mid - 1
+        data["linkedin_watch"] = watch[:lo]
+        if len(_dumps(slim)) <= TOOL_JSON_MAX:
+            return slim
+    return _slim_generic(out, "scout")
+
+
 def _slim_products(out: dict[str, Any]) -> dict[str, Any]:
     """A product list keeps its summary whole: it names every product, and product_id
     takes a name or domain, so the ids are what can go. The generic cut at 1,500
@@ -163,6 +208,8 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
         slim = _slim_products(out)
         if len(_dumps(slim)) > TOOL_JSON_MAX:
             slim = _slim_generic(out, tool_name)
+    elif tool_name == "scout" and (isinstance(data.get("channels"), list) or isinstance(data.get("linkedin_watch"), list)):
+        slim = _slim_scout(out)
     else:
         slim = _slim_generic(out, tool_name)
 
