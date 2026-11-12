@@ -71,7 +71,10 @@ def _scout(n_channels: int, n_profiles: int, active: int = 1) -> dict:
     watch = [f'https://www.linkedin.com/in/person-number-{i}/' for i in range(n_profiles)]
     return {
         'summary': f'{n_channels} channels; watching {n_profiles} LinkedIn profiles',
-        'data': {'channels': channels, 'hunt': 'Alex comments on pricing. ' * 50, 'linkedin_watch': watch},
+        'data': {
+            'channels': channels, 'hunt': 'Alex comments on pricing. ' * 50, 'skip_authors': [],
+            'telegram_venues': [], 'linkedin_watch': watch, 'quora_hours': None,
+        },
     }
 
 
@@ -99,19 +102,61 @@ def test_a_scout_get_keeps_every_channel_when_only_the_briefs_were_too_long(plug
 
 def test_a_watch_list_too_long_for_one_reply_keeps_its_head_and_its_total(plugin):
     _, tool_call = plugin
-    for answer in (_scout(21, 150), {'summary': 'Added 1', 'data': {'added': ['x'], 'linkedin_watch': _scout(0, 150)['data']['linkedin_watch']}}):
+    watched = {'summary': 'Added 1', 'data': {'added': ['x'], 'linkedin_watch': _scout(0, 150)['data']['linkedin_watch']}}
+    for answer in (_scout(21, 150), watched):
         out, oversized = tool_call._fit_tool_json('scout', answer)
         assert oversized and len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
         shown = out['data']['linkedin_watch']
         assert out['data']['linkedin_watch_total'] == 150
         if 'channels' in answer['data']:
-            # The switched-off channels went first; the one that is on stays.
+            # The switched-off channels went first; the one that is on stays, and so does a hunt brief this short.
             assert [c['channel'] for c in out['data']['channels']] == ['ch0']
             assert out['data']['channels_off_left_out'] == 20
+            assert out['data']['hunt'] == answer['data']['hunt'] and 'left_out' not in out['data']
         assert 0 < len(shown) < 150 and shown == answer['data']['linkedin_watch'][: len(shown)]
+        # The model is told the list is a head, so it never passes it off as the whole list.
+        assert out['summary'].startswith(answer['summary'])
+        assert f'first {len(shown)} of the 150 watched profiles' in out['summary']
         # The head is as long as fits: one more profile would not.
         more = dict(out['data'], linkedin_watch=answer['data']['linkedin_watch'][: len(shown) + 1])
         assert len(tool_call._dumps({**out, 'data': more})) > tool_call.TOOL_JSON_MAX
+
+
+def test_a_long_hunt_brief_never_costs_the_watched_profiles(plugin):
+    """The hunt brief has no length cap and grows a paragraph per lane. On Competera's answer a brief of 5,300
+    characters left the list three profiles, 5,450 an empty list, and 5,500 the generic cut with no list at all."""
+    _, tool_call = plugin
+    for n in (21, 150):
+        for size in range(0, 12001, 250):
+            answer = _scout(21, n)
+            answer['data']['hunt'] = 'h' * size
+            out, _ = tool_call._fit_tool_json('scout', answer)
+            data, watch = out['data'], answer['data']['linkedin_watch']
+            assert len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
+            shown = data['linkedin_watch']
+            assert shown == watch[: len(shown)]
+            if n == 21:
+                assert shown == watch and 'linkedin_watch_total' not in data
+            else:
+                assert len(shown) >= 5 and data['linkedin_watch_total'] == 150
+            # The hunt brief is there whole or named as left out; an empty field is not named.
+            assert data.get('hunt') == answer['data']['hunt'] or 'hunt' in data['left_out']
+            assert 'skip_authors' not in data.get('left_out', [])
+            assert data['briefs_left_out'] and 'ch0' in [c['channel'] for c in data['channels']]
+
+
+def test_the_rest_gives_way_when_it_leaves_the_list_no_room(plugin):
+    """Every channel on and a summary naming fifty blogs leave no room for one profile beside a hunt brief under half
+    the reply, so the rest goes instead of the list."""
+    _, tool_call = plugin
+    answer = _scout(21, 150, active=21)
+    answer['summary'] += '; blogs ' + ', '.join(f'blog{i}.example.com' for i in range(50))
+    answer['data']['hunt'] = 'h' * 2900
+    out, _ = tool_call._fit_tool_json('scout', answer)
+    assert len(tool_call._dumps(out)) <= tool_call.TOOL_JSON_MAX
+    data = out['data']
+    assert len(data['linkedin_watch']) >= 5 and data['linkedin_watch_total'] == 150
+    assert data['left_out'] == ['hunt'] and len(data['channels']) == 21
 
 
 def test_a_scout_answer_that_fits_goes_through_whole(plugin):

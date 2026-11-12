@@ -92,16 +92,48 @@ def _slim_generic(out: dict[str, Any], tool_name: str) -> dict[str, Any]:
 
 # What a scout channel row keeps when its brief is left out.
 _SCOUT_CHANNEL_KEEP = ("channel", "label", "active", "auto", "daily_cap", "standing")
+# What a scout answer keeps when the rest of it (hunt brief, venues, skip list) is left out.
+_SCOUT_CORE = ("channels", "linkedin_watch", "briefs_left_out", "channels_off_left_out")
+
+
+def _watch_head(out: dict[str, Any], data: dict[str, Any], watch: list) -> dict[str, Any] | None:
+    """The answer with `data` and the longest head of the watch list that fits beside it, the total
+    kept and the cut said in the summary; None when not one profile fits."""
+    summary = (out.get("summary") or "").strip()
+
+    def cut(n: int) -> dict[str, Any]:
+        note = (
+            f"linkedin_watch holds the first {n} of the {len(watch)} watched profiles; "
+            "the rest did not fit one reply."
+        )
+        return {
+            **out,
+            "summary": f"{summary} {note}".strip(),
+            "data": {**data, "linkedin_watch": watch[:n], "linkedin_watch_total": len(watch)},
+        }
+
+    lo, hi = 0, len(watch)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if len(_dumps(cut(mid))) <= TOOL_JSON_MAX:
+            lo = mid
+        else:
+            hi = mid - 1
+    return cut(lo) if lo else None
 
 
 def _slim_scout(out: dict[str, Any]) -> dict[str, Any]:
-    """The scout tool's answer without the channel briefs, then without the channels that are off,
-    then with the LinkedIn watch list cut to what fits and its total kept.
+    """The scout tool's answer without the channel briefs, then without the channels that are off.
+    Past that the rest of the answer (hunt brief, venues, skip list) stays beside the LinkedIn watch
+    list while it takes under half the reply, and is left out, named in left_out, when it takes more
+    or leaves no room for one profile. The list is cut last, to its longest head, with its total and
+    the cut said in the summary.
 
     `scout action=get` carries every channel's whole brief, about 7,000 characters each: Competera's
     21 channels answered about 100,000 characters, the generic cut left the summary alone, and asked
     for "перші 5 профайлів" the bot had no list to show (2026-11-12). The watched profiles are what a
-    founder asks this tool for, and a brief is one `scout revise` away.
+    founder asks this tool for in chat. A brief changes through `scout revise`, which takes the
+    founder's words and never needs the old brief in chat.
     """
     data = dict(out["data"]) if isinstance(out.get("data"), dict) else {}
     slim = {**out, "data": data}
@@ -119,19 +151,18 @@ def _slim_scout(out: dict[str, Any]) -> dict[str, Any]:
         if len(_dumps(slim)) <= TOOL_JSON_MAX:
             return slim
     watch = data.get("linkedin_watch")
-    if isinstance(watch, list) and watch:
-        data["linkedin_watch_total"] = len(watch)
-        lo, hi = 0, len(watch)
-        while lo < hi:  # the longest head of the list that fits
-            mid = (lo + hi + 1) // 2
-            data["linkedin_watch"] = watch[:mid]
-            if len(_dumps(slim)) <= TOOL_JSON_MAX:
-                lo = mid
-            else:
-                hi = mid - 1
-        data["linkedin_watch"] = watch[:lo]
-        if len(_dumps(slim)) <= TOOL_JSON_MAX:
-            return slim
+    if not (isinstance(watch, list) and watch):
+        return _slim_generic(out, "scout")
+    rest = {k: v for k, v in data.items() if k not in _SCOUT_CORE}
+    core = {k: v for k, v in data.items() if k in _SCOUT_CORE}
+    core["left_out"] = sorted(k for k, v in rest.items() if v not in (None, "", [], {}))
+    for d in ((core,) if len(_dumps(rest)) > TOOL_JSON_MAX // 2 else (data, core)):
+        whole = {**out, "data": d}
+        if len(_dumps(whole)) <= TOOL_JSON_MAX:
+            return whole
+        head = _watch_head(out, d, watch)
+        if head:
+            return head
     return _slim_generic(out, "scout")
 
 
@@ -208,7 +239,7 @@ def _fit_tool_json(tool_name: str, out: dict[str, Any]) -> tuple[dict[str, Any],
         slim = _slim_products(out)
         if len(_dumps(slim)) > TOOL_JSON_MAX:
             slim = _slim_generic(out, tool_name)
-    elif tool_name == "scout" and (isinstance(data.get("channels"), list) or isinstance(data.get("linkedin_watch"), list)):
+    elif tool_name == "scout" and any(isinstance(data.get(k), list) for k in ("channels", "linkedin_watch")):
         slim = _slim_scout(out)
     else:
         slim = _slim_generic(out, tool_name)
